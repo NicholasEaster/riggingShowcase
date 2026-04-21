@@ -1,269 +1,376 @@
+# ik_fk_generator_A01240437.py 
+# ik fk creation script
+# Generates FK and IK controls for the selected joint (preferably the wrist)
+# By @Nicholas Easter
+
 import maya.cmds as cmds
-import os
-
-EXPORT_PATH_OPTIONVAR = "OBJExporter_LastExportPath"
-
-########FUNCTION TO CHANGE A PIVOT#######
-## Calls changePivotHelper
-def changePivot(pivotRadio):
-    pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)
-    sel = cmds.ls(selection=True, long=True)
-    
-    print(pivotResults)
-    if not sel:
-        cmds.warning('No objects were selected')
-        return
+def createIkFk(radiusField, basicColourValues, switchColourValues):
+    controlSize = cmds.intField(radiusField, query=True, value=True)
+    print (controlSize)
+    selected = cmds.ls(selection=1, type='joint')
+    if not selected:
+        cmds.warning("You need to select an object.")
+    else:           
+        # Select the wrist joint (in a list to avoid error if there arent enough parent objects)
         
-    for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        changePivotHelper(pivotResults, obj_name)
-    
-    return
-    
-########FUNCTION TO HELP CHANGE A PIVOT#######
-## This function works on a specific object provided 
-def changePivotHelper(pivotResults, object):
-    if pivotResults == 1:
-        bbox = cmds.xform(object, query=True, boundingBox=True, worldSpace=True) #Get the object bounds
-        x = bbox[0]
-        y = bbox[1]
-        z = bbox[5]
-        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom left
-    elif pivotResults == 3:         
-        bbox = cmds.xform(object, query=True, boundingBox=True, worldSpace=True) #Get the object bounds
-        x = (bbox[0] + bbox[3]) / 2.0
-        y = bbox[1]
-        z = (bbox[2] + bbox[5]) / 2.0
-        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom center
-    
-    return
-
-########FUNCTION TO CHECK MODEL GEOMETRY#######
-## Calls checkGEOHelper
-def checkGEO(checkBoxes):               
-    sel = cmds.ls(selection=True, long=True)
-    
-    #print(pivotResults)
-    if not sel:
-        cmds.warning('No objects were selected')
-        return
+        wrist_jnt = cmds.ls(selection=1, type='joint')[0]
+        wrist_pos = cmds.getAttr(f'{wrist_jnt}.translateX')
         
-    for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        checkGEOHelper(checkBoxes, obj_name)
-    
-    return
-
-########FUNCTION TO HELP CHECK GEO#######
-## This function works on a specific object provided 
-def checkGEOHelper(checkBoxes, object, mode="manual"):
-    cmds.select(object, r=True) #Select the object just in case
-    
-    problemComponents = [] #Make an array of problems (verts / edges/ faces)
-    issues = [] #Make an array to display the problems (just used for a warning)
-    
-    originalSelection = cmds.ls(sl=True) #Store the original selection
-    
-    if mode == "manual":
-        nonManifoldCheck = cmds.checkBoxGrp(checkBoxes, query=True, value1=True) #Get info from checkboxes
-        NgonsCheck = cmds.checkBoxGrp(checkBoxes, query=True, value2=True)
-        deleteHistoryCheck = cmds.checkBoxGrp(checkBoxes, query=True, value3=True)
-        freezeTransformsCheck = cmds.checkBoxGrp(checkBoxes, query=True, value4=True)
-    elif  mode == "validate":
-        nonManifoldCheck = True
-        NgonsCheck = True
-        deleteHistoryCheck = False
-        freezeTransformsCheck = False
+        # Select the wrist joint (in a list to avoid error if there arent enough parent objects)
         
-    if nonManifoldCheck:
-        cmds.polySelectConstraint(mode=3, type=1, nonmanifold=True) #Check for non manifold geo
-        nonManifoldGeo = cmds.ls(sl=True, fl=True) #If anything is selected, return true
-        problemComponents.extend(nonManifoldGeo) #Add the geo to the array
+        elbow_jnt = cmds.listRelatives(wrist_jnt, parent=1)
+        
+        # Select the wrist joint (in a list to avoid error if there arent enough parent objects)
+        
+        shoulder_jnt = cmds.listRelatives(elbow_jnt, parent=1)
     
-        if nonManifoldGeo:
-            issues.append("non-manifold")
+        # Select the wrist joint (in a list to avoid error if there arent enough parent objects)
+        
+        clavicle_jnt = cmds.listRelatives(shoulder_jnt, parent=1)
+    
+        # Duplicate arm for FK
+        
+        if clavicle_jnt == None:
+            cmds.warning("You must have 3 parent joints")
+        else:          
+            # Get the selected joints and remove them from their respected lists
             
-    if NgonsCheck:
-        cmds.polySelectConstraint(mode=3, type=8, size=3) #Check for Ngons, type is set to face
-        ngons = cmds.ls(sl=True, fl=True) #If anything is selected, return true
-        problemComponents.extend(ngons) #Add the geo to the array
-    
-        if ngons:
-            issues.append("ngons")
-    
-    if deleteHistoryCheck:
-        cmds.delete(object, constructionHistory=True) #Delete History
-        
-    if freezeTransformsCheck:
-        cmds.makeIdentity(object, apply=True, t=1, r=1, s=1) #Freeze translate, rotate, scale
-      
-    cmds.polySelectConstraint(mode=0) #Reset constraint
-
-    if problemComponents: #If there are elements in the problem array
-        cmds.select(list(set(problemComponents)), replace=True) #Select them
-    else:
-        cmds.select(originalSelection) #Get the original selection
-        
-    if issues:
-            cmds.warning(f"{object} issues: {', '.join(issues)}") #Format the warning                               
-    return issues
-
+            elbow_jnt = elbow_jnt[0]
+            shoulder_jnt = shoulder_jnt[0]
+            clavicle_jnt = clavicle_jnt[0]
+               
+            elbow_fk_control, shoulder_fk_control, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt = createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues)
             
-########FUNCTION TO EXPORT #######
-## This function requires a export path and pivot radio to query
-def export_Objects(filePath, pivotRadio, checkBoxes):
-    export_path = cmds.textField(filePath, query=True, text=True)
-    pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)    
-        
-    ########PRELIMINARY CHECKS#######
-    if not export_path:
-        cmds.warning("Please select an export directory.")
-        return
+            wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, elbow_ik_control, elbow_ik_control, wrist_ik_control, offset_lctr, ik_handle = createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, controlSize, basicColourValues)
             
-    sel = cmds.ls(selection=True, long=True)
-    if not sel:
-        cmds.warning('No objects were selected')
-        return
-
-    invalidObjects = {} #Check for invalid objects
-    for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1]
-        issues = checkGEOHelper(checkBoxes, obj_name, "validate")
-
-        if issues:
-            invalidObjects[obj_name] = issues
-
-    if invalidObjects:
-        cmds.warning("Export aborted: geometry issues detected.")
-        return
+            # Create the Ik/Fk Switch control and group it
+            
+            ik_fk_switch_distance = (-2/3)
+            ik_fk_switch_control_z = wrist_pos * ik_fk_switch_distance
+            ik_fk_switch_control = cmds.circle(degree=1, name=wrist_jnt+'_ik_fk_switch_control', radius = controlSize)[0]
+            ik_fk_switch_control_grp = cmds.group(ik_fk_switch_control, name=ik_fk_switch_control+'_grp')
+            changeColour(ik_fk_switch_control, switchColourValues)
+            
+            # Match the groups transforms to the joints
+            
+            cmds.matchTransform(ik_fk_switch_control_grp, wrist_ik_jnt)
+        
+            # Parents constrains the wrist jnt to the ik_fk_switch_control_grp to the wrist jnt and offsets it.
+            
+            cmds.parentConstraint(wrist_jnt, ik_fk_switch_control_grp)
+            cmds.move(0,0,ik_fk_switch_control_z, ik_fk_switch_control, relative=1, objectSpace=1)
+            cmds.makeIdentity (ik_fk_switch_control, apply=1, translate=1, rotate=1, scale=1, normal=0, preserveNormals=1)
+            
+            # Add a custom attribute
+            
+            cmds.addAttr(ik_fk_switch_control, keyable=1, longName='ikFkSwitch', defaultValue=1, minValue=0, maxValue=1)
+            
+            # Connect the rotations of the IK and FK joints to the skinning joint
+       
+            original_jnts = [wrist_jnt, elbow_jnt, shoulder_jnt]
+            for jnts in (original_jnts):
+            
+                # Create a pairBlend node
+                ik_fk_blend = cmds.shadingNode('pairBlend', name=(jnts+'_pairBlend'), asUtility=1)
+    
+                # Connect fk joints rotate and translate to pairBlends in rotate1/inTranslate1
+    
+                cmds.connectAttr(jnts+'_fk.rotate', ik_fk_blend+'.inRotate1', force=1)
+                cmds.connectAttr(jnts+'_fk.translate', ik_fk_blend+'.inTranslate1', force=1)
+                        
+                # Connect ik joints rotate and translate to pairBlends in rotate2/inTranslate2
                 
-    for selectedObjects in sel:
-        ##Create the duplicate and transfer the name
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name.
-        tempRename = cmds.rename(selectedObjects, obj_name + "_")
-        duplicate = cmds.duplicate(tempRename, name=obj_name)[0]       
-         
-        hasParent=cmds.listRelatives(selectedObjects, parent=True)                  
-        if hasParent:
-            cmds.parent(duplicate, world=True)
+                cmds.connectAttr(jnts+'_ik.rotate', ik_fk_blend+'.inRotate2', force=1)
+                cmds.connectAttr(jnts+'_ik.translate', ik_fk_blend+'.inTranslate2', force=1)        
             
-        ##Modify Pivot
-        changePivotHelper(pivotResults, duplicate)
-        
-        ##Move to Origin
-        currentPositionXYZ = cmds.xform(duplicate, q=True, ws=True, rp=True)
-        cmds.move(-currentPositionXYZ[0], -currentPositionXYZ[1], -currentPositionXYZ[2], duplicate, r=True, ws=True)
-        cmds.makeIdentity(duplicate, apply=True, translate=True, rotate=True, scale=True, normal=False, preserveNormals=True)
-        
-        cmds.select(duplicate, replace=True)
-        
-        ########EXPORT#######
-        export_file = os.path.join(export_path, obj_name + ".fbx")
-        
-        try:
-            cmds.file(
-                export_file,
-                force=True,
-                options="v=0;",
-                typ="FBX export",
-                exportSelected=True
-            )
-            print(f"Successfully exported selected objects to: {export_path}")
-        except RuntimeError as e:
-            print(f"Error during FBX export: {e}")
-        
-        #######CLEANUP#######
-        cmds.delete(duplicate)
-        cmds.rename(tempRename, obj_name)
-    cmds.optionVar(stringValue=(EXPORT_PATH_OPTIONVAR, export_path))
+                # connect ik/fk switch ctrls switch channel to the pairBlends weight attribute
+                
+                cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', ik_fk_blend+'.weight', force=1)                   
+                
+                # Connect pairBlends outRotate/outTranslate to the skinning joints rotate and translate
     
-########FUNCTION TO FIND A FOLDER#######
-## This function requires a text field and will open a folder browser
-def browseForFolder(text_field):
-    folder = cmds.fileDialog2(fileMode=3, dialogStyle=2)
+                cmds.connectAttr(ik_fk_blend+'.outRotate', jnts+'.rotate', force=1)
+                cmds.connectAttr(ik_fk_blend+'.outTranslate', jnts+'.translate', force=1)           
+    
+                # Connect scale using a blend channel node
+                
+                ik_fk_colours = cmds.shadingNode('blendColors', name=(jnts+'_blendColours'), asUtility=1)
+                
+                # Connect fk scale to blendColours color 1, ik scale to color 2
+                
+                cmds.connectAttr(jnts+'_fk.scale', ik_fk_colours+'.color1', force=1)
+                cmds.connectAttr(jnts+'_ik.scale', ik_fk_colours+'.color2', force=1)
+    
+                # Connect the ikFkSwitch ctrl attribute to the blendColors blender
+                cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', ik_fk_colours+'.blender', force=1) 
+                
+                # Connect the blend Colors output to skinning joint scale
+     
+                cmds.connectAttr(ik_fk_colours+'.output', jnts+'.scale', force=1)                   
+                
+            # Drive the visibility of the fk and ik controls with the switch control
+    
+            # When in Fk mode (switch attr = 0), hide ik controls  
+            
+            # Create condition node
+    
+            fk_vis_condition = cmds.shadingNode('condition', name=('fk_vis_condition'), asUtility=1)
+    
+            # Connect the ikFk Switch attributes to IK vis conditions firstTerm
+            
+            cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', fk_vis_condition+'.firstTerm', force=1) 
+            
+            # Connect fk Vis Condition's outColor to fk wrist/elbow visibility
+            
+            cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', elbow_ik_control+'.visibility', force=1) 
+            cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', wrist_ik_control+'.visibility', force=1) 
+            
+            # When in Ik mode (switch attr = 1), hide fk controls  
+            
+            # Create condition node
+            
+            ik_vis_condition = cmds.shadingNode('condition', name=('ik_vis_condition'), asUtility=1)
+    
+            # Connect the IkFkSwitch attr to FK Vis condition's first Term
+            
+            cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', ik_vis_condition+'.firstTerm', force=1) 
+            
+            # Sets the ik condition's second term to be 1
+                    
+            cmds.setAttr (ik_vis_condition+'.secondTerm', 1)
+            
+            # Connect Ik Vis Condition's outColorR to shoulder vis
+            
+            cmds.connectAttr(ik_vis_condition+'.outColor.outColorR', shoulder_fk_control+'.visibility', force=1) 
+           
+            # Hide the ik/fk joints
+            
+            #sets the axis, attributes, and visibility
+            
+            axis = ('x', 'y', 'z')
+            attributes = ('t', 'r', 's')
+            visibility = ('v')
+            
+            # Creates a list of all joints / controls
+            
+            ik_fk_jnts = [wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt, offset_lctr]
+            
+            # Turns off the jnts visibility and locks/hides them
+            
+            for jnts in ik_fk_jnts:   
+                for vis in visibility:   
+                    cmds.setAttr (jnts+'.'+vis, 0)
+                    cmds.setAttr (jnts+'.'+vis, lock=1, keyable=0)
+                
+            # Hide the ik handle
+            
+            cmds.setAttr (ik_handle+'.visibility', 0)
+            
+            # Locks/hides specific controls attributes
+            
+            for ax in axis:
+                for at in attributes:
+                    for vis in visibility:
+                            cmds.setAttr(ik_fk_switch_control+'.'+at+ax, lock=1, keyable=0)
+                            cmds.setAttr(ik_fk_switch_control+'.'+vis, lock=1, keyable=0)
 
-    if folder:
-        cmds.textField(text_field, edit=True, text=folder[0])
-        cmds.optionVar(stringValue=(EXPORT_PATH_OPTIONVAR, folder[0]))
+def createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues):    
+    # The duplication station starts here
+    
+    shoulder_fk = cmds.duplicate(shoulder_jnt, name=shoulder_jnt+'_fk', renameChildren=1)    
+    shoulder_fk_relatives = cmds.listRelatives(shoulder_fk, allDescendents=1)
+    shoulder_fk_jnt = (shoulder_fk)[0]
+    
+    # Get the duplicated elbow/ wrist joints        
+    elbow_fk_jnt = cmds.listRelatives(shoulder_fk, children=1)[0]
+    wrist_fk_jnt = cmds.listRelatives(shoulder_fk, children=1)[1]
+    
+    # Renames the new joints
 
+    if shoulder_fk_relatives:
+        if elbow_fk_jnt:
+            shoulder_fk_relatives.remove(elbow_fk_jnt)
+            elbow_fk_jnt = cmds.rename (elbow_fk_jnt, elbow_jnt+'_fk')
+        if wrist_fk_jnt:    
+            shoulder_fk_relatives.remove(wrist_fk_jnt)
+            wrist_fk_jnt = cmds.rename (wrist_fk_jnt, wrist_jnt+'_fk')
+   
+        # Delete all extra joints that arent  the elbow and wrist
+        
+    if shoulder_fk_relatives:
+        cmds.delete(shoulder_fk_relatives)
+
+    # Build fk controls
+        
+    # Creates circles and groups them
+        
+    shoulder_fk_control = cmds.circle(name=shoulder_fk_jnt+'_control', radius=controlSize, nr=(1, 0, 0))[0]
+    elbow_fk_control = cmds.circle(name=elbow_fk_jnt+'_control', radius=controlSize, nr=(1, 0, 0))[0]
+    wrist_fk_control = cmds.circle(name=wrist_fk_jnt+'_control', radius=controlSize, nr=(1, 0, 0))[0]
+    
+    changeColour(shoulder_fk_control, basicColourValues)
+    changeColour(elbow_fk_control, basicColourValues)
+    changeColour(wrist_fk_control, basicColourValues)
+
+    shoulder_fk_control_grp = cmds.group(shoulder_fk_control, name=shoulder_fk_control+'_grp')
+    elbow_fk_control_grp = cmds.group(elbow_fk_control, name=elbow_fk_control+'_grp')
+    wrist_fk_control_grp = cmds.group(wrist_fk_control, name=wrist_fk_control+'_grp')  
+    
+    # Match the groups transforms to the joints
+    
+    cmds.matchTransform(shoulder_fk_control_grp, shoulder_fk_jnt)
+    cmds.matchTransform(elbow_fk_control_grp, elbow_fk_jnt)
+    cmds.matchTransform(wrist_fk_control_grp, wrist_fk_jnt)
+    
+    # Parents the controls to the jnts
+            
+    cmds.parentConstraint(shoulder_fk_control, shoulder_fk_jnt)
+    cmds.parentConstraint(elbow_fk_control, elbow_fk_jnt)
+    cmds.parentConstraint(wrist_fk_control, wrist_fk_jnt)
+    
+    # Parents the wrist_ctrl to the elbow and elbow to the shoulder
+    
+    cmds.parent (wrist_fk_control_grp, elbow_fk_control)
+    cmds.parent (elbow_fk_control_grp, shoulder_fk_control)
+    return elbow_fk_control, shoulder_fk_control, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt
+
+
+def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, controlSize, basicColourValues):    
+    # Duplicate arm for IK.
+    
+    # The duplication station starts here
+    
+    shoulder_ik = cmds.duplicate(shoulder_jnt, name=shoulder_jnt+'_ik', renameChildren=1)    
+    shoulder_ik_relatives = cmds.listRelatives(shoulder_ik, allDescendents=1)
+    shoulder_ik_jnt = (shoulder_ik)[0]
+        
+    # Get the duplicated elbow/ wrist joints
+    elbow_ik_jnt = cmds.listRelatives(shoulder_ik, children=1)[0]
+    wrist_ik_jnt = cmds.listRelatives(shoulder_ik, children=1)[1]
+
+  
+    # Renames the new joints
+    
+    if shoulder_ik_relatives:
+        if elbow_ik_jnt:    
+            shoulder_ik_relatives.remove(elbow_ik_jnt)
+            elbow_ik_jnt = cmds.rename (elbow_ik_jnt, elbow_jnt+'_ik')
+        if wrist_ik_jnt:    
+            shoulder_ik_relatives.remove(wrist_ik_jnt)
+            wrist_ik_jnt = cmds.rename (wrist_ik_jnt, wrist_jnt+'_ik')
+       
+        # Delete all extra joints that arent  the elbow and wrist
+
+
+    if shoulder_ik_relatives:
+        cmds.delete(shoulder_ik_relatives)
+        
+    # Create an ikHandle and parent it to the wrist control
+    
+    ik_handle = cmds.ikHandle(startJoint=shoulder_ik_jnt, endEffector=wrist_ik_jnt, sol='ikRPsolver', name=wrist_jnt+'_ik_handle')[0]
+    
+    # Creates a circle and groups it  
+    wrist_ik_control = cmds.circle(name=wrist_ik_jnt+'_control', radius = controlSize, nr=(1, 0, 0))[0]            
+    wrist_ik_control_grp = cmds.group(wrist_ik_control, name=wrist_ik_control+'_grp')
+    changeColour(wrist_ik_control, basicColourValues)  
+    # Match the groups transforms to the joints
+    
+    cmds.matchTransform(wrist_ik_control_grp, wrist_ik_jnt)  
+
+    # Parents the ik_handle to the wrist control
+        
+    cmds.parent (ik_handle, wrist_ik_control)
+   
+    # Orients the wrist control to the wrist_ik_jnt
+    
+    cmds.orientConstraint(wrist_ik_control, wrist_ik_jnt)
+   
+    # create an elbow ik control and create pole vector constraint
+    
+    # Creates a circle and groups it
+    
+    elbow_ik_control = cmds.circle(name=elbow_ik_jnt+'_control', radius = controlSize)[0]
+    elbow_ik_control_grp = cmds.group(elbow_ik_control, name=elbow_ik_control+'_grp')
+    changeColour(elbow_ik_control, basicColourValues)  
+    
+    # Match the groups transforms to the joints
+    
+    cmds.matchTransform(elbow_ik_control_grp, elbow_ik_jnt) 
+
+    # Find the new location of the elbow control
+    
+    elbow_distance = (-2/3)
+    
+    elbow_distance_z = wrist_pos * (elbow_distance)
+    
+    cmds.move(0,0,elbow_distance_z, elbow_ik_control_grp, relative=1, objectSpace=1)
+        
+    # Create the pole vector contstraint
+
+    cmds.poleVectorConstraint(elbow_ik_control, ik_handle)
+   
+    # Crates a ik offset locator
+    
+    offset_lctr = cmds.spaceLocator(name=('ik_offset_locator'))[0]
+    offset_lctr_counter_grp = cmds.group(offset_lctr, name=offset_lctr+'counter_grp')
+    offset_lctr_grp = cmds.group(offset_lctr_counter_grp, name=offset_lctr+'_grp')
+    
+    # Match the transforms and parent the group
+    cmds.matchTransform(offset_lctr_grp, elbow_jnt)
+    cmds.parent(offset_lctr_grp, elbow_fk_control)
+
+    # Have the counter group rotate 50% in the opposite direction of the elbow fk con
+    
+    offset_lctr_md = cmds.shadingNode('multiplyDivide', name=offset_lctr+'_counterMultiplyDivide', asUtility=True)
+    cmds.setAttr(offset_lctr_md+'.input2', -0.5, -0.5, -0.5)
+    cmds.connectAttr(elbow_fk_control+'.rotate', offset_lctr_md+'.input1')
+    cmds.connectAttr(offset_lctr_md+'.output', offset_lctr_counter_grp+'.rotate')
+        
+    # Move the locator to the elbow ik con
+    
+    cmds.matchTransform(offset_lctr, elbow_ik_control)
+        
+    return wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, elbow_ik_control, elbow_ik_control, wrist_ik_control, offset_lctr, ik_handle
+                     
+def changeColour(circleName, colourValues):
+    shape_node = cmds.listRelatives(circleName, shapes=True)[0]
+    cmds.setAttr(shape_node+ ".overrideRGBColors", 1)
+    cmds.setAttr(shape_node + ".overrideEnabled", 1)
+    cmds.setAttr(shape_node + ".overrideColorRGB", colourValues[0],colourValues[1],colourValues[2])
+
+def newColourSwatch(canvas):
+    cmds.colorEditor()
+    
+    if cmds.colorEditor(query=True, result=True):
+        values = cmds.colorEditor(query=True, rgb=True)
+        
+        # Update the canvas color
+        cmds.canvas(canvas, edit=True, rgbValue=values)
+        
+        return values
 ########FUNCTION TO CREATE THE WINDOW#######
 ## This function creates a window and calls the functions above
 def createWindow():
     # Create Window  
-    windowName = "OBJ_Exporter"
+    windowName = "ik_fk_Creator"
     print (windowName)
     
     #Removes Current Window (If There Is One Already Up)
     if cmds.window(windowName, exists=True):
         cmds.deleteUI(windowName)
     
-    window_width = 400
+    window_width = 275
     window_height = 300 
     cmds.window(windowName, title=windowName, widthHeight=(window_width, window_height), sizeable=False)  
     
     #Creates The Window
     mainLayout = cmds.columnLayout( adjustableColumn=True )    
     
-    #######PIVOT PLANET#######
-    pivotFrame = cmds.frameLayout(
-        label="Pivot Location",
-        collapsable=False,
-        marginWidth=8,
-        marginHeight=6,
-        parent=mainLayout
-    )
-    pivotColumn = cmds.columnLayout(adjustableColumn=True, parent=pivotFrame)
-
-    pivotRadio = cmds.radioButtonGrp(
-        labelArray3=["Bottom Left", "Custom", "Bottom Center"],
-        numberOfRadioButtons=3,
-        select=2
-    )
-    
-    #Start Pivot
-    cmds.button(
-        label="Modify Pivot",parent= mainLayout,
-        command=lambda *args: changePivot(pivotRadio)
-    )
-    
-    cmds.text(label="",parent= mainLayout)
-    
-    #######MESH CLEANUP#######
-    cmds.separator(height=8, style="in", parent=mainLayout)
-    
-    cleanupFrame = cmds.frameLayout(
-        label="Cleanup Object",
-        collapsable=False,
-        marginWidth=8,
-        marginHeight=6,
-        parent=mainLayout
-    )
-    
-    cleanupCol = cmds.rowColumnLayout(
-        numberOfColumns=3,
-        columnAttach=([1, 'right', 5], [2, 'left', 5], [3, 'left', 5]),
-        parent=mainLayout
-    )
-    
-    checkBoxes = cmds.checkBoxGrp(
-    labelArray4=["nonManifold", "Ngons", "Delete History", "Freeze Transforms"],
-    numberOfCheckBoxes=4,
-    columnWidth4=[100,65,100,100]
-    )
-    
-    #Start Cleanup
-    cmds.button(
-        label="Check Objects",parent= mainLayout,
-        command=lambda *args: checkGEO(checkBoxes)
-    )
-    
-    cmds.text(label="",parent= mainLayout)
-   
     #######EXPORT PATH#######
     cmds.separator(height=8, style="in", parent=mainLayout)
     
     exportFrame = cmds.frameLayout(
-        label="Export Path",
+        label="Controls",
         collapsable=False,
         marginWidth=8,
         marginHeight=6,
@@ -271,28 +378,29 @@ def createWindow():
     )
     
     exportCol = cmds.rowColumnLayout(
-        numberOfColumns=3,
-        columnAttach=([1, 'right', 5], [2, 'left', 5], [3, 'left', 5]),
+        numberOfColumns=2,
+        columnAttach=([1, 'right', 5], [2, 'left', 5]),
         parent=mainLayout
     )
     
-    cmds.text(label='  Export Path:', align='right')
-    exportPathField = cmds.textField(width=210)
-    if cmds.optionVar(exists=EXPORT_PATH_OPTIONVAR):
-        savedPath = cmds.optionVar(query=EXPORT_PATH_OPTIONVAR)
-        cmds.textField(exportPathField, edit=True, text=savedPath)
+    cmds.text(label='  Control Size:', align='right')
+    radiusField = cmds.intField(width=40, value = 1)
+       
+    cmds.text(label='  Control Colour:', align='right')
+    basicColourValues = (0, 0, 0.5)    
+    colourCanvas01  = cmds.canvas(width=40, rgbValue=(basicColourValues), pressCommand=lambda *args: newColourSwatch(colourCanvas01))
+    
+    cmds.text(label='  Control SwitchColour:', align='right')
+    switchColourValues = (0, 0.7, 0)
+    colourCanvas02  = cmds.canvas(width=40, rgbValue=(switchColourValues), pressCommand=lambda *args: newColourSwatch(colourCanvas02))
+
     
     cmds.button(
-        label="Browse...",
-        command=lambda *args: browseForFolder(exportPathField)
-    )
-  
-    cmds.button(
-        label="Export Objects", parent= mainLayout,
-        command=lambda *args: export_Objects(exportPathField, pivotRadio, checkBoxes)
+        label="Create IK FK", parent= mainLayout,
+        command=lambda *args: createIkFk(radiusField,basicColourValues, switchColourValues)
     )          
       
     cmds.showWindow(windowName)
-    
+
 #main
 createWindow()
