@@ -37,37 +37,21 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
             
             elbow_jnt = elbow_jnt[0]
             shoulder_jnt = shoulder_jnt[0]
-            clavicle_jnt = clavicle_jnt[0]
-               
-            elbow_fk_control, shoulder_fk_control, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt = createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues)
             
-            wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, elbow_ik_control, elbow_ik_control, wrist_ik_control, offset_lctr, ik_handle = createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, controlSize, basicColourValues)
+            original_jnts = [wrist_jnt, elbow_jnt, shoulder_jnt]
+            #fkJnts = [wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt]
+            #fkControls = [elbow_fk_control, shoulder_fk_control, wrist_fk_control]    
+                    
+            #ikJnts = [wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt]
+            #ikControls = [elbow_ik_control, wrist_ik_control]
             
-            # Create the Ik/Fk Switch control and group it
+            fkJnts, fkControls = createFK(original_jnts, wrist_pos, controlSize, basicColourValues)
             
-            ik_fk_switch_distance = (-2/3)
-            ik_fk_switch_control_z = wrist_pos * ik_fk_switch_distance
-            ik_fk_switch_control = cmds.circle(degree=1, name=wrist_jnt+'_ik_fk_switch_control', radius = controlSize)[0]
-            ik_fk_switch_control_grp = cmds.group(ik_fk_switch_control, name=ik_fk_switch_control+'_grp')
-            changeColour(ik_fk_switch_control, switchColourValues)
+            ikJnts, ikControls, offset_lctr, ik_handle = createIK(original_jnts, wrist_pos, fkControls, controlSize, basicColourValues)
             
-            # Match the groups transforms to the joints
-            
-            cmds.matchTransform(ik_fk_switch_control_grp, wrist_ik_jnt)
-        
-            # Parents constrains the wrist jnt to the ik_fk_switch_control_grp to the wrist jnt and offsets it.
-            
-            cmds.parentConstraint(wrist_jnt, ik_fk_switch_control_grp)
-            cmds.move(0,0,ik_fk_switch_control_z, ik_fk_switch_control, relative=1, objectSpace=1)
-            cmds.makeIdentity (ik_fk_switch_control, apply=1, translate=1, rotate=1, scale=1, normal=0, preserveNormals=1)
-            
-            # Add a custom attribute
-            
-            cmds.addAttr(ik_fk_switch_control, keyable=1, longName='ikFkSwitch', defaultValue=1, minValue=0, maxValue=1)
+            ik_fk_switch_control = createSwitch(original_jnts, wrist_pos, ikJnts, fkJnts, controlSize, switchColourValues)
             
             # Connect the rotations of the IK and FK joints to the skinning joint
-       
-            original_jnts = [wrist_jnt, elbow_jnt, shoulder_jnt]
             for jnts in (original_jnts):
             
                 # Create a pairBlend node
@@ -106,44 +90,15 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
                 
                 # Connect the blend Colors output to skinning joint scale
      
-                cmds.connectAttr(ik_fk_colours+'.output', jnts+'.scale', force=1)                   
-                
+                cmds.connectAttr(ik_fk_colours+'.output', jnts+'.scale', force=1)      
+              
             # Drive the visibility of the fk and ik controls with the switch control
     
             # When in Fk mode (switch attr = 0), hide ik controls  
             
-            # Create condition node
-    
-            fk_vis_condition = cmds.shadingNode('condition', name=('fk_vis_condition'), asUtility=1)
-    
-            # Connect the ikFk Switch attributes to IK vis conditions firstTerm
+            setupVisibility(ikControls, fkControls, ik_fk_switch_control)
             
-            cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', fk_vis_condition+'.firstTerm', force=1) 
-            
-            # Connect fk Vis Condition's outColor to fk wrist/elbow visibility
-            
-            cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', elbow_ik_control+'.visibility', force=1) 
-            cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', wrist_ik_control+'.visibility', force=1) 
-            
-            # When in Ik mode (switch attr = 1), hide fk controls  
-            
-            # Create condition node
-            
-            ik_vis_condition = cmds.shadingNode('condition', name=('ik_vis_condition'), asUtility=1)
-    
-            # Connect the IkFkSwitch attr to FK Vis condition's first Term
-            
-            cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', ik_vis_condition+'.firstTerm', force=1) 
-            
-            # Sets the ik condition's second term to be 1
-                    
-            cmds.setAttr (ik_vis_condition+'.secondTerm', 1)
-            
-            # Connect Ik Vis Condition's outColorR to shoulder vis
-            
-            cmds.connectAttr(ik_vis_condition+'.outColor.outColorR', shoulder_fk_control+'.visibility', force=1) 
-           
-            # Hide the ik/fk joints
+# Hide the ik/fk joints
             
             #sets the axis, attributes, and visibility
             
@@ -152,8 +107,12 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
             visibility = ('v')
             
             # Creates a list of all joints / controls
-            
-            ik_fk_jnts = [wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt, offset_lctr]
+            combinedList = [ikJnts, fkJnts]
+            ik_fk_jnts = [item for inner_list in combinedList for item in inner_list]
+            ik_fk_jnts.append(offset_lctr)
+            #ik_fk_jnts = [ikJnts, fkJnts, offset_lctr]
+            print(ik_fk_jnts)
+            #ik_fk_jnts = [wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt, offset_lctr]
             
             # Turns off the jnts visibility and locks/hides them
             
@@ -174,10 +133,10 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
                             cmds.setAttr(ik_fk_switch_control+'.'+at+ax, lock=1, keyable=0)
                             cmds.setAttr(ik_fk_switch_control+'.'+vis, lock=1, keyable=0)
 
-def createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues):    
+def createFK(original_jnts, wrist_pos, controlSize, basicColourValues):    
     # The duplication station starts here
-    
-    shoulder_fk = cmds.duplicate(shoulder_jnt, name=shoulder_jnt+'_fk', renameChildren=1)    
+    #original_jnts[wrist, elbow, shoulder]
+    shoulder_fk = cmds.duplicate(original_jnts[2], name=original_jnts[2]+'_fk', renameChildren=1)    
     shoulder_fk_relatives = cmds.listRelatives(shoulder_fk, allDescendents=1)
     shoulder_fk_jnt = (shoulder_fk)[0]
     
@@ -190,10 +149,10 @@ def createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues)
     if shoulder_fk_relatives:
         if elbow_fk_jnt:
             shoulder_fk_relatives.remove(elbow_fk_jnt)
-            elbow_fk_jnt = cmds.rename (elbow_fk_jnt, elbow_jnt+'_fk')
+            elbow_fk_jnt = cmds.rename (elbow_fk_jnt, original_jnts[1]+'_fk')
         if wrist_fk_jnt:    
             shoulder_fk_relatives.remove(wrist_fk_jnt)
-            wrist_fk_jnt = cmds.rename (wrist_fk_jnt, wrist_jnt+'_fk')
+            wrist_fk_jnt = cmds.rename (wrist_fk_jnt, original_jnts[0]+'_fk')
    
         # Delete all extra joints that arent  the elbow and wrist
         
@@ -232,15 +191,18 @@ def createFK(shoulder_jnt, elbow_jnt, wrist_jnt, controlSize, basicColourValues)
     
     cmds.parent (wrist_fk_control_grp, elbow_fk_control)
     cmds.parent (elbow_fk_control_grp, shoulder_fk_control)
-    return elbow_fk_control, shoulder_fk_control, wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt
-
-
-def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, controlSize, basicColourValues):    
-    # Duplicate arm for IK.
     
+    fkJnts = [wrist_fk_jnt, elbow_fk_jnt, shoulder_fk_jnt]
+    fkControls = [elbow_fk_control, shoulder_fk_control, wrist_fk_control]
+    return fkJnts, fkControls
+
+
+def createIK(original_jnts, wrist_pos, fkControls, controlSize, basicColourValues):    
+    # Duplicate arm for IK.
+ 
     # The duplication station starts here
     
-    shoulder_ik = cmds.duplicate(shoulder_jnt, name=shoulder_jnt+'_ik', renameChildren=1)    
+    shoulder_ik = cmds.duplicate(original_jnts[2], name=original_jnts[2]+'_ik', renameChildren=1)    
     shoulder_ik_relatives = cmds.listRelatives(shoulder_ik, allDescendents=1)
     shoulder_ik_jnt = (shoulder_ik)[0]
         
@@ -254,10 +216,10 @@ def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, co
     if shoulder_ik_relatives:
         if elbow_ik_jnt:    
             shoulder_ik_relatives.remove(elbow_ik_jnt)
-            elbow_ik_jnt = cmds.rename (elbow_ik_jnt, elbow_jnt+'_ik')
+            elbow_ik_jnt = cmds.rename (elbow_ik_jnt, original_jnts[1]+'_ik')
         if wrist_ik_jnt:    
             shoulder_ik_relatives.remove(wrist_ik_jnt)
-            wrist_ik_jnt = cmds.rename (wrist_ik_jnt, wrist_jnt+'_ik')
+            wrist_ik_jnt = cmds.rename (wrist_ik_jnt, original_jnts[0]+'_ik')
        
         # Delete all extra joints that arent  the elbow and wrist
 
@@ -267,7 +229,7 @@ def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, co
         
     # Create an ikHandle and parent it to the wrist control
     
-    ik_handle = cmds.ikHandle(startJoint=shoulder_ik_jnt, endEffector=wrist_ik_jnt, sol='ikRPsolver', name=wrist_jnt+'_ik_handle')[0]
+    ik_handle = cmds.ikHandle(startJoint=shoulder_ik_jnt, endEffector=wrist_ik_jnt, sol='ikRPsolver', name=original_jnts[0]+'_ik_handle')[0]
     
     # Creates a circle and groups it  
     wrist_ik_control = cmds.circle(name=wrist_ik_jnt+'_control', radius = controlSize, nr=(1, 0, 0))[0]            
@@ -291,6 +253,7 @@ def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, co
     
     elbow_ik_control = cmds.circle(name=elbow_ik_jnt+'_control', radius = controlSize)[0]
     elbow_ik_control_grp = cmds.group(elbow_ik_control, name=elbow_ik_control+'_grp')
+
     changeColour(elbow_ik_control, basicColourValues)  
     
     # Match the groups transforms to the joints
@@ -303,8 +266,7 @@ def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, co
     
     elbow_distance_z = wrist_pos * (elbow_distance)
     
-    cmds.move(0,0,elbow_distance_z, elbow_ik_control_grp, relative=1, objectSpace=1)
-        
+    cmds.move(0,0,elbow_distance_z, elbow_ik_control_grp, relative=1, objectSpace=1)       
     # Create the pole vector contstraint
 
     cmds.poleVectorConstraint(elbow_ik_control, ik_handle)
@@ -316,22 +278,80 @@ def createIK(shoulder_jnt, elbow_jnt, wrist_jnt, wrist_pos, elbow_fk_control, co
     offset_lctr_grp = cmds.group(offset_lctr_counter_grp, name=offset_lctr+'_grp')
     
     # Match the transforms and parent the group
-    cmds.matchTransform(offset_lctr_grp, elbow_jnt)
-    cmds.parent(offset_lctr_grp, elbow_fk_control)
+    cmds.matchTransform(offset_lctr_grp, original_jnts[1])
+    cmds.parent(offset_lctr_grp, fkControls[1])
 
     # Have the counter group rotate 50% in the opposite direction of the elbow fk con
     
     offset_lctr_md = cmds.shadingNode('multiplyDivide', name=offset_lctr+'_counterMultiplyDivide', asUtility=True)
     cmds.setAttr(offset_lctr_md+'.input2', -0.5, -0.5, -0.5)
-    cmds.connectAttr(elbow_fk_control+'.rotate', offset_lctr_md+'.input1')
+    cmds.connectAttr(fkControls[1]+'.rotate', offset_lctr_md+'.input1')
     cmds.connectAttr(offset_lctr_md+'.output', offset_lctr_counter_grp+'.rotate')
         
     # Move the locator to the elbow ik con
     
     cmds.matchTransform(offset_lctr, elbow_ik_control)
-        
-    return wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt, elbow_ik_control, elbow_ik_control, wrist_ik_control, offset_lctr, ik_handle
-                     
+    ikJnts = [wrist_ik_jnt, elbow_ik_jnt, shoulder_ik_jnt]
+    ikControls = [elbow_ik_control, wrist_ik_control]        
+    return ikJnts, ikControls, offset_lctr, ik_handle
+
+
+def createSwitch(original_jnts, wrist_pos, ikJnts, fkJnts, controlSize, switchColourValues):
+    # Create the Ik/Fk Switch control and group it
+    
+    ik_fk_switch_distance = (-2/3)
+    ik_fk_switch_control_z = wrist_pos * ik_fk_switch_distance
+    ik_fk_switch_control = cmds.circle(degree=1, name=original_jnts[0]+'_ik_fk_switch_control', radius = controlSize)[0]
+    ik_fk_switch_control_grp = cmds.group(ik_fk_switch_control, name=ik_fk_switch_control+'_grp')
+    changeColour(ik_fk_switch_control, switchColourValues)
+    
+    # Match the groups transforms to the joints
+    
+    cmds.matchTransform(ik_fk_switch_control_grp, ikJnts[0])
+
+    cmds.move(0,0,ik_fk_switch_control_z, ik_fk_switch_control, relative=1, objectSpace=1)
+    cmds.makeIdentity (ik_fk_switch_control, apply=1, translate=1, rotate=1, scale=1, normal=0, preserveNormals=1)
+    
+    # Add a custom attribute
+    
+    cmds.addAttr(ik_fk_switch_control, keyable=1, longName='ikFkSwitch', defaultValue=1.0, minValue=0.0, maxValue=1.0, attributeType='float')
+    return ik_fk_switch_control
+
+def setupVisibility(ikControls, fkControls, ik_fk_switch_control):
+
+    # Create condition node
+
+    fk_vis_condition = cmds.shadingNode('condition', name=('fk_vis_condition'), asUtility=1)
+    
+    # Connect the ikFk Switch attributes to IK vis conditions firstTerm
+    
+    cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', fk_vis_condition+'.firstTerm', force=1) 
+    
+    # Connect fk Vis Condition's outColor to fk wrist/elbow visibility
+    
+    cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', ikControls[1]+'.visibility', force=1) 
+    cmds.connectAttr(fk_vis_condition+'.outColor.outColorR', ikControls[0]+'.visibility', force=1) 
+    
+    # When in Ik mode (switch attr = 1), hide fk controls  
+    
+    # Create condition node
+    
+    ik_vis_condition = cmds.shadingNode('condition', name=('ik_vis_condition'), asUtility=1)
+    
+    # Connect the IkFkSwitch attr to FK Vis condition's first Term
+    
+    cmds.connectAttr(ik_fk_switch_control+'.ikFkSwitch', ik_vis_condition+'.firstTerm', force=1) 
+    
+    # Sets the ik condition's second term to be 1
+            
+    cmds.setAttr (ik_vis_condition+'.secondTerm', 1)
+    
+    # Connect Ik Vis Condition's outColorR to fk vis
+    
+    cmds.connectAttr(ik_vis_condition+'.outColor.outColorR', fkControls[2]+'.visibility', force=1) 
+    cmds.connectAttr(ik_vis_condition+'.outColor.outColorR', fkControls[1]+'.visibility', force=1) 
+    cmds.connectAttr(ik_vis_condition+'.outColor.outColorR', fkControls[0]+'.visibility', force=1) 
+                                     
 def changeColour(circleName, colourValues):
     shape_node = cmds.listRelatives(circleName, shapes=True)[0]
     cmds.setAttr(shape_node+ ".overrideRGBColors", 1)
