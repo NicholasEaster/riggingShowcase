@@ -1,27 +1,27 @@
 //Maya ASCII 2024 scene
 //Name: ik_fk_builder.ma
-//Last modified: Tue, Apr 21, 2026 09:48:01 PM
+//Last modified: Sun, Apr 26, 2026 07:54:37 PM
 //Codeset: 1252
 requires maya "2024";
 requires "stereoCamera" "10.0";
-requires "vstUtils" "1.0";
-requires "mtoa" "4.2.4";
 requires "Mayatomr" "2012.0m - 3.9.1.47 ";
+requires "mtoa" "4.2.4";
 requires "stereoCamera" "10.0";
 requires "vsMaster" "1.0";
+requires "vstUtils" "1.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2024";
 fileInfo "version" "2024";
 fileInfo "cutIdentifier" "202310181224-69282f2959";
 fileInfo "osv" "Windows 11 Home v2009 (Build: 26200)";
-fileInfo "UUID" "3C8AAD4F-4F12-F732-DBD7-A68C3E14A00D";
+fileInfo "UUID" "443678AA-484C-F362-890C-27AD0C57787A";
 fileInfo "license" "education";
 createNode transform -s -n "persp";
 	rename -uid "F64654FE-417E-60AC-FC09-09915981D44C";
 	setAttr ".v" no;
-	setAttr ".t" -type "double3" 0.20054659380382223 12.669961209175412 36.027359934414633 ;
-	setAttr ".r" -type "double3" -5.7383527296647543 -14.999999999999249 -1.0289851569409208e-16 ;
+	setAttr ".t" -type "double3" 1.0480331929859632 22.936487404144373 36.194739217587475 ;
+	setAttr ".r" -type "double3" -26.738352729681814 -5.4000000000082489 1.9967081373054048e-16 ;
 createNode camera -s -n "perspShape" -p "persp";
 	rename -uid "549EF3E7-4D68-6E0E-00C7-EBA48E1DC3AF";
 	setAttr -k off ".v" no;
@@ -111,7 +111,6 @@ createNode joint -n "left_Elbow_Jnt" -p "left_Shoulder_Jnt";
 createNode joint -n "left_Wrist_Jnt" -p "left_Elbow_Jnt";
 	rename -uid "0494B064-41E4-5451-AF6B-CDB9856333C3";
 	setAttr ".t" -type "double3" 5.660059720617709 0 8.8817841970012523e-16 ;
-	setAttr ".r" -type "double3" 0 -6.3611093629270335e-15 0 ;
 	setAttr ".mnrl" -type "double3" -360 -360 -360 ;
 	setAttr ".mxrl" -type "double3" 360 360 360 ;
 	setAttr ".jo" -type "double3" 0 14.72420944983253 0 ;
@@ -317,16 +316,70 @@ createNode mesh -n "BackdropShape" -p "Backdrop";
 	setAttr ".cvd" -type "dataPolyComponent" Index_Data Vertex 0 ;
 	setAttr ".pd[0]" -type "dataPolyComponent" Index_Data UV 0 ;
 	setAttr ".hfd" -type "dataPolyComponent" Index_Data Face 0 ;
+createNode transform -n "pCube1";
+	rename -uid "CBD2DDF0-4458-D04B-F471-7BB4BF5694F3";
+	setAttr ".rp" -type "double3" 0 5.4206755682722108 0 ;
+	setAttr ".sp" -type "double3" 0 5.4206755682722108 0 ;
+createNode mesh -n "pCube1Shape" -p "pCube1";
+	rename -uid "95E80757-414E-994C-E4F1-3784807F1D62";
+	setAttr -k off ".v";
+	setAttr ".vir" yes;
+	setAttr ".vif" yes;
+	setAttr -s 6 ".gtag";
+	setAttr ".gtag[0].gtagnm" -type "string" "back";
+	setAttr ".gtag[0].gtagcmp" -type "componentList" 1 "f[2]";
+	setAttr ".gtag[1].gtagnm" -type "string" "bottom";
+	setAttr ".gtag[1].gtagcmp" -type "componentList" 1 "f[3]";
+	setAttr ".gtag[2].gtagnm" -type "string" "front";
+	setAttr ".gtag[2].gtagcmp" -type "componentList" 1 "f[0]";
+	setAttr ".gtag[3].gtagnm" -type "string" "left";
+	setAttr ".gtag[3].gtagcmp" -type "componentList" 1 "f[5]";
+	setAttr ".gtag[4].gtagnm" -type "string" "right";
+	setAttr ".gtag[4].gtagcmp" -type "componentList" 1 "f[4]";
+	setAttr ".gtag[5].gtagnm" -type "string" "top";
+	setAttr ".gtag[5].gtagcmp" -type "componentList" 1 "f[1]";
+	setAttr ".uvst[0].uvsn" -type "string" "map1";
+	setAttr -s 14 ".uvst[0].uvsp[0:13]" -type "float2" 0.375 0 0.625 0 0.375
+		 0.25 0.625 0.25 0.375 0.5 0.625 0.5 0.375 0.75 0.625 0.75 0.375 1 0.625 1 0.875 0
+		 0.875 0.25 0.125 0 0.125 0.25;
+	setAttr ".cuvs" -type "string" "map1";
+	setAttr ".dcc" -type "string" "Ambient+Diffuse";
+	setAttr ".covm[0]"  0 1 1;
+	setAttr ".cdvm[0]"  0 1 1;
+	setAttr -s 8 ".pt[0:7]" -type "float3"  0 5.4206758 0 0 5.4206758 
+		0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 
+		0;
+	setAttr -s 8 ".vt[0:7]"  -0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 0.5 0.5 0.5
+		 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5;
+	setAttr -s 12 ".ed[0:11]"  0 1 0 2 3 0 4 5 0 6 7 0 0 2 0 1 3 0 2 4 0
+		 3 5 0 4 6 0 5 7 0 6 0 0 7 1 0;
+	setAttr -s 6 -ch 24 ".fc[0:5]" -type "polyFaces" 
+		f 4 0 5 -2 -5
+		mu 0 4 0 1 3 2
+		f 4 1 7 -3 -7
+		mu 0 4 2 3 5 4
+		f 4 2 9 -4 -9
+		mu 0 4 4 5 7 6
+		f 4 3 11 -1 -11
+		mu 0 4 6 7 9 8
+		f 4 -12 -10 -8 -6
+		mu 0 4 1 10 11 3
+		f 4 10 4 6 8
+		mu 0 4 12 0 2 13;
+	setAttr ".cd" -type "dataPolyComponent" Index_Data Edge 0 ;
+	setAttr ".cvd" -type "dataPolyComponent" Index_Data Vertex 0 ;
+	setAttr ".pd[0]" -type "dataPolyComponent" Index_Data UV 0 ;
+	setAttr ".hfd" -type "dataPolyComponent" Index_Data Face 0 ;
 createNode lightLinker -s -n "lightLinker1";
-	rename -uid "53A333E1-4763-2684-3864-40AC1A2A515D";
+	rename -uid "1D5C0894-40EB-302F-19A4-AC880D5A8A76";
 	setAttr -s 3 ".lnk";
 	setAttr -s 3 ".slnk";
 createNode shapeEditorManager -n "shapeEditorManager";
-	rename -uid "A9D26824-44C7-16F5-F82B-C7903C75DFA0";
+	rename -uid "413D5EBE-494E-1B2C-7EDD-59985FBEB5E4";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
-	rename -uid "0427F824-4EB6-DAE0-FCEA-FBB070526022";
+	rename -uid "AB803AD3-438D-F4F0-8D82-F4832BCDEB32";
 createNode displayLayerManager -n "layerManager";
-	rename -uid "CC9AD4F1-4E48-6DB4-2495-B8855AF0BCC7";
+	rename -uid "149056F5-4030-C06D-DF85-B58A8B40E99C";
 	setAttr ".cdl" 5;
 	setAttr -s 6 ".dli[1:5]"  1 2 3 4 5;
 	setAttr -s 2 ".dli";
@@ -334,7 +387,7 @@ createNode displayLayer -n "defaultLayer";
 	rename -uid "0691B058-443E-9EF4-5759-A9A8351AA070";
 	setAttr ".ufem" -type "stringArray" 0  ;
 createNode renderLayerManager -n "renderLayerManager";
-	rename -uid "D7508107-4724-61BA-7B2E-1784073A7E36";
+	rename -uid "9CF1530D-4052-D358-9E2E-25B881C3E2F0";
 createNode renderLayer -n "defaultRenderLayer";
 	rename -uid "BE8AD5AC-42D7-0EF6-1B08-60BD0285BD6F";
 	setAttr ".g" yes;
@@ -904,8 +957,6 @@ select -ne :hardwareRenderGlobals;
 	setAttr -k on ".bswa";
 	setAttr -k on ".shml";
 	setAttr -k on ".hwel";
-select -ne :ikSystem;
-	setAttr -s 4 ".sol";
 connectAttr "spineTop1.s" "left_Clavicle_Jnt.is";
 connectAttr "left_Clavicle_Jnt.s" "left_Shoulder_Jnt.is";
 connectAttr "left_Shoulder_Jnt.s" "left_Elbow_Jnt.is";
@@ -990,4 +1041,5 @@ connectAttr "left_Shoulder_Jnt_blendColours.msg" ":defaultRenderUtilityList1.u"
 connectAttr "pasted__place2dTexture2.msg" ":defaultRenderUtilityList1.u" -na;
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "pasted__file2.msg" ":defaultTextureList1.tx" -na;
+connectAttr "pCube1Shape.iog" ":initialShadingGroup.dsm" -na;
 // End of ik_fk_builder.ma
