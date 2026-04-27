@@ -1,6 +1,6 @@
 //Maya ASCII 2024 scene
 //Name: ik_fk_builder.ma
-//Last modified: Sun, Apr 26, 2026 07:54:37 PM
+//Last modified: Sun, Apr 26, 2026 11:04:53 PM
 //Codeset: 1252
 requires maya "2024";
 requires "stereoCamera" "10.0";
@@ -15,22 +15,22 @@ fileInfo "product" "Maya 2024";
 fileInfo "version" "2024";
 fileInfo "cutIdentifier" "202310181224-69282f2959";
 fileInfo "osv" "Windows 11 Home v2009 (Build: 26200)";
-fileInfo "UUID" "443678AA-484C-F362-890C-27AD0C57787A";
+fileInfo "UUID" "5BBE9663-498B-98B1-37B0-A3A601FF0833";
 fileInfo "license" "education";
 createNode transform -s -n "persp";
 	rename -uid "F64654FE-417E-60AC-FC09-09915981D44C";
 	setAttr ".v" no;
-	setAttr ".t" -type "double3" 1.0480331929859632 22.936487404144373 36.194739217587475 ;
-	setAttr ".r" -type "double3" -26.738352729681814 -5.4000000000082489 1.9967081373054048e-16 ;
+	setAttr ".t" -type "double3" 8.8140920229206987 18.032903314646955 25.455941219811901 ;
+	setAttr ".r" -type "double3" -15.938352729231323 -360.2000000001882 -3.1060293541104895e-17 ;
 createNode camera -s -n "perspShape" -p "persp";
 	rename -uid "549EF3E7-4D68-6E0E-00C7-EBA48E1DC3AF";
 	setAttr -k off ".v" no;
 	setAttr ".fl" 34.999999999999993;
-	setAttr ".coi" 38.066513278353426;
+	setAttr ".coi" 24.426401325083543;
 	setAttr ".imn" -type "string" "persp";
 	setAttr ".den" -type "string" "persp_depth";
 	setAttr ".man" -type "string" "persp_mask";
-	setAttr ".tp" -type "double3" 13.388971343754211 7.6059956587077284 0.84030468558296345 ;
+	setAttr ".tp" -type "double3" 16.65082066165338 7.6059956587077293 0.46360460195148434 ;
 	setAttr ".hc" -type "string" "viewSet -p %camera";
 createNode transform -s -n "top";
 	rename -uid "A5F6A96C-4C78-BA2A-5F64-D99E7EBF59FB";
@@ -316,64 +316,10 @@ createNode mesh -n "BackdropShape" -p "Backdrop";
 	setAttr ".cvd" -type "dataPolyComponent" Index_Data Vertex 0 ;
 	setAttr ".pd[0]" -type "dataPolyComponent" Index_Data UV 0 ;
 	setAttr ".hfd" -type "dataPolyComponent" Index_Data Face 0 ;
-createNode transform -n "pCube1";
-	rename -uid "CBD2DDF0-4458-D04B-F471-7BB4BF5694F3";
-	setAttr ".rp" -type "double3" 0 5.4206755682722108 0 ;
-	setAttr ".sp" -type "double3" 0 5.4206755682722108 0 ;
-createNode mesh -n "pCube1Shape" -p "pCube1";
-	rename -uid "95E80757-414E-994C-E4F1-3784807F1D62";
-	setAttr -k off ".v";
-	setAttr ".vir" yes;
-	setAttr ".vif" yes;
-	setAttr -s 6 ".gtag";
-	setAttr ".gtag[0].gtagnm" -type "string" "back";
-	setAttr ".gtag[0].gtagcmp" -type "componentList" 1 "f[2]";
-	setAttr ".gtag[1].gtagnm" -type "string" "bottom";
-	setAttr ".gtag[1].gtagcmp" -type "componentList" 1 "f[3]";
-	setAttr ".gtag[2].gtagnm" -type "string" "front";
-	setAttr ".gtag[2].gtagcmp" -type "componentList" 1 "f[0]";
-	setAttr ".gtag[3].gtagnm" -type "string" "left";
-	setAttr ".gtag[3].gtagcmp" -type "componentList" 1 "f[5]";
-	setAttr ".gtag[4].gtagnm" -type "string" "right";
-	setAttr ".gtag[4].gtagcmp" -type "componentList" 1 "f[4]";
-	setAttr ".gtag[5].gtagnm" -type "string" "top";
-	setAttr ".gtag[5].gtagcmp" -type "componentList" 1 "f[1]";
-	setAttr ".uvst[0].uvsn" -type "string" "map1";
-	setAttr -s 14 ".uvst[0].uvsp[0:13]" -type "float2" 0.375 0 0.625 0 0.375
-		 0.25 0.625 0.25 0.375 0.5 0.625 0.5 0.375 0.75 0.625 0.75 0.375 1 0.625 1 0.875 0
-		 0.875 0.25 0.125 0 0.125 0.25;
-	setAttr ".cuvs" -type "string" "map1";
-	setAttr ".dcc" -type "string" "Ambient+Diffuse";
-	setAttr ".covm[0]"  0 1 1;
-	setAttr ".cdvm[0]"  0 1 1;
-	setAttr -s 8 ".pt[0:7]" -type "float3"  0 5.4206758 0 0 5.4206758 
-		0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 0 0 5.4206758 
-		0;
-	setAttr -s 8 ".vt[0:7]"  -0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 0.5 0.5 0.5
-		 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5;
-	setAttr -s 12 ".ed[0:11]"  0 1 0 2 3 0 4 5 0 6 7 0 0 2 0 1 3 0 2 4 0
-		 3 5 0 4 6 0 5 7 0 6 0 0 7 1 0;
-	setAttr -s 6 -ch 24 ".fc[0:5]" -type "polyFaces" 
-		f 4 0 5 -2 -5
-		mu 0 4 0 1 3 2
-		f 4 1 7 -3 -7
-		mu 0 4 2 3 5 4
-		f 4 2 9 -4 -9
-		mu 0 4 4 5 7 6
-		f 4 3 11 -1 -11
-		mu 0 4 6 7 9 8
-		f 4 -12 -10 -8 -6
-		mu 0 4 1 10 11 3
-		f 4 10 4 6 8
-		mu 0 4 12 0 2 13;
-	setAttr ".cd" -type "dataPolyComponent" Index_Data Edge 0 ;
-	setAttr ".cvd" -type "dataPolyComponent" Index_Data Vertex 0 ;
-	setAttr ".pd[0]" -type "dataPolyComponent" Index_Data UV 0 ;
-	setAttr ".hfd" -type "dataPolyComponent" Index_Data Face 0 ;
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "1D5C0894-40EB-302F-19A4-AC880D5A8A76";
-	setAttr -s 3 ".lnk";
-	setAttr -s 3 ".slnk";
+	setAttr -s 5 ".lnk";
+	setAttr -s 5 ".slnk";
 createNode shapeEditorManager -n "shapeEditorManager";
 	rename -uid "413D5EBE-494E-1B2C-7EDD-59985FBEB5E4";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
@@ -706,6 +652,22 @@ createNode nodeGraphEditorInfo -n "hyperShadePrimaryNodeEditorSavedTabsInfo";
 	setAttr ".tgi[0].tn" -type "string" "Untitled_1";
 	setAttr ".tgi[0].vl" -type "double2" -622.61902287839052 -388.09522267371955 ;
 	setAttr ".tgi[0].vh" -type "double2" 592.85711929911758 407.14284096445425 ;
+createNode lambert -n "lambert2";
+	rename -uid "C4F34D27-4AC5-32CD-19D3-E294190CDD3B";
+createNode shadingEngine -n "pCube1SG";
+	rename -uid "69BC3F30-4DE2-7E1B-7F4C-BB8ED8EE65C3";
+	setAttr ".ihi" 0;
+	setAttr ".ro" yes;
+createNode materialInfo -n "materialInfo1";
+	rename -uid "30EBDE36-497A-3D52-2107-EDA07B0927D6";
+createNode lambert -n "lambert3";
+	rename -uid "48C714FE-4173-46CD-DC76-7382F7F3202A";
+createNode shadingEngine -n "pCube1SG1";
+	rename -uid "3890FA69-4AA0-70E3-1567-8B83B751B5A6";
+	setAttr ".ihi" 0;
+	setAttr ".ro" yes;
+createNode materialInfo -n "materialInfo2";
+	rename -uid "C028D796-4993-B69B-D12C-009851458269";
 select -ne :time1;
 	setAttr -av -k on ".cch";
 	setAttr -av -cb on ".ihi";
@@ -737,7 +699,7 @@ select -ne :renderPartition;
 	setAttr -cb on ".ihi";
 	setAttr -av -k on ".nds";
 	setAttr -cb on ".bnm";
-	setAttr -s 3 ".st";
+	setAttr -s 5 ".st";
 	setAttr -cb on ".an";
 	setAttr -cb on ".pt";
 select -ne :renderGlobalsList1;
@@ -750,7 +712,7 @@ select -ne :defaultShaderList1;
 	setAttr -cb on ".ihi";
 	setAttr -k on ".nds";
 	setAttr -cb on ".bnm";
-	setAttr -s 6 ".s";
+	setAttr -s 8 ".s";
 select -ne :postProcessList1;
 	setAttr -k on ".cch";
 	setAttr -cb on ".ihi";
@@ -764,7 +726,7 @@ select -ne :defaultRenderingList1;
 select -ne :defaultTextureList1;
 select -ne :standardSurface1;
 	setAttr ".bc" -type "float3" 0.40000001 0.40000001 0.40000001 ;
-	setAttr ".sr" 0.40000000596046448;
+	setAttr ".sr" 0.5;
 select -ne :initialShadingGroup;
 	setAttr -av -k on ".cch";
 	setAttr -cb on ".ihi";
@@ -957,6 +919,8 @@ select -ne :hardwareRenderGlobals;
 	setAttr -k on ".bswa";
 	setAttr -k on ".shml";
 	setAttr -k on ".hwel";
+select -ne :ikSystem;
+	setAttr -s 4 ".sol";
 connectAttr "spineTop1.s" "left_Clavicle_Jnt.is";
 connectAttr "left_Clavicle_Jnt.s" "left_Shoulder_Jnt.is";
 connectAttr "left_Shoulder_Jnt.s" "left_Elbow_Jnt.is";
@@ -981,9 +945,13 @@ connectAttr "backdropLayer.di" "Backdrop.do";
 relationship "link" ":lightLinker1" ":initialShadingGroup.message" ":defaultLightSet.message";
 relationship "link" ":lightLinker1" ":initialParticleSE.message" ":defaultLightSet.message";
 relationship "link" ":lightLinker1" "pasted__lambert3SG.message" ":defaultLightSet.message";
+relationship "link" ":lightLinker1" "pCube1SG.message" ":defaultLightSet.message";
+relationship "link" ":lightLinker1" "pCube1SG1.message" ":defaultLightSet.message";
 relationship "shadowLink" ":lightLinker1" ":initialShadingGroup.message" ":defaultLightSet.message";
 relationship "shadowLink" ":lightLinker1" ":initialParticleSE.message" ":defaultLightSet.message";
 relationship "shadowLink" ":lightLinker1" "pasted__lambert3SG.message" ":defaultLightSet.message";
+relationship "shadowLink" ":lightLinker1" "pCube1SG.message" ":defaultLightSet.message";
+relationship "shadowLink" ":lightLinker1" "pCube1SG1.message" ":defaultLightSet.message";
 connectAttr "layerManager.dli[0]" "defaultLayer.id";
 connectAttr "renderLayerManager.rlmi[0]" "defaultRenderLayer.rlid";
 connectAttr "uiConfigurationScriptNode.msg" "MayaNodeEditorSavedTabsInfo.tgi[0].ni[2].dn"
@@ -1025,8 +993,18 @@ connectAttr "pasted__place2dTexture2.vt3" "pasted__file2.vt3";
 connectAttr "pasted__place2dTexture2.vc1" "pasted__file2.vc1";
 connectAttr "pasted__place2dTexture2.o" "pasted__file2.uv";
 connectAttr "pasted__place2dTexture2.ofs" "pasted__file2.fs";
+connectAttr "lambert2.oc" "pCube1SG.ss";
+connectAttr "pCube1SG.msg" "materialInfo1.sg";
+connectAttr "lambert2.msg" "materialInfo1.m";
+connectAttr "lambert3.oc" "pCube1SG1.ss";
+connectAttr "pCube1SG1.msg" "materialInfo2.sg";
+connectAttr "lambert3.msg" "materialInfo2.m";
 connectAttr "pasted__lambert3SG.pa" ":renderPartition.st" -na;
+connectAttr "pCube1SG.pa" ":renderPartition.st" -na;
+connectAttr "pCube1SG1.pa" ":renderPartition.st" -na;
 connectAttr "pasted__Background.msg" ":defaultShaderList1.s" -na;
+connectAttr "lambert2.msg" ":defaultShaderList1.s" -na;
+connectAttr "lambert3.msg" ":defaultShaderList1.s" -na;
 connectAttr "Forearm_01_multDiv.msg" ":defaultRenderUtilityList1.u" -na;
 connectAttr "Forearm_02_multDiv.msg" ":defaultRenderUtilityList1.u" -na;
 connectAttr "Forearm_03_multDiv.msg" ":defaultRenderUtilityList1.u" -na;
@@ -1041,5 +1019,4 @@ connectAttr "left_Shoulder_Jnt_blendColours.msg" ":defaultRenderUtilityList1.u"
 connectAttr "pasted__place2dTexture2.msg" ":defaultRenderUtilityList1.u" -na;
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "pasted__file2.msg" ":defaultTextureList1.tx" -na;
-connectAttr "pCube1Shape.iog" ":initialShadingGroup.dsm" -na;
 // End of ik_fk_builder.ma

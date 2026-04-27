@@ -1,26 +1,42 @@
 
 import maya.cmds as cmds
 
-def createSingleControl(radiusField, colour):
+def createSingleControl(radiusField, colourValues):
     controlSize = cmds.intField(radiusField, query=True, value=True)
     selected = cmds.ls(selection=1, type='joint')
     if not selected:
         cmds.warning("You need to select a joint.")
     else: 
         jnt = cmds.ls(selection=1, type='joint')[0]   
-        jntControl, jntControlGrp = createControl(jnt, colour, controlSize)
+        jntControl, jntControlGrp = createControl(jnt, colourValues["control"], controlSize)
         cmds.matchTransform(jntControlGrp, jnt)
         cmds.parentConstraint(jntControl, jnt)
            
+def createCubeControl(name, size):
+    s = size
 
+    points = [
+        (-s, -s, -s), (s, -s, -s), (s, s, -s), (-s, s, -s), (-s, -s, -s),
+        (-s, -s, s), (s, -s, s), (s, s, s), (-s, s, s), (-s, -s, s),
+        (-s, -s, -s), (s, -s, -s), (s, -s, s), (s, s, s),
+        (s, s, -s), (-s, s, -s), (-s, s, s)
+    ]
+
+    curve = cmds.curve(name=name, d=1, p=points)
+    return curve
+    
 def createControl(originalJnt, colour, controlSize):
     jntControl = cmds.circle(name=originalJnt+'Control', radius=controlSize, nr=(1, 0, 0))[0]    
     changeColour(jntControl, colour)
     jntControlGrp = cmds.group(jntControl, name=jntControl+'Grp') 
     return jntControl, jntControlGrp
         
-def createIkFk(radiusField, basicColourValues, switchColourValues):
+def createIkFk(radiusField, colourValues):
+    basicColour = colourValues["control"]
+    switchColour = colourValues["switch"]
+    poleColour = colourValues["pole"]
     controlSize = cmds.intField(radiusField, query=True, value=True)
+    
     selected = cmds.ls(selection=1, type='joint')
     if not selected:
         cmds.warning("You need to select a joint.")
@@ -54,12 +70,48 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
             
             originalJnts = [wristJnt, elbowJnt, shoulderJnt]
             
-            fkJnts, fkControls = createFK(originalJnts, wristPos, controlSize, basicColourValues)
+            fkJnts, fkControls = createFK(originalJnts, wristPos, controlSize, basicColour)
             
-            ikJnts, ikControls, offsetLctr, ikHandle = createIK(originalJnts, wristPos, fkControls, controlSize, basicColourValues)
+            ikJnts, ikControls, offsetLctr, ikHandle = createIK(originalJnts, wristPos, fkControls, controlSize, colourValues)
             
-            ikFkSwitchControl = createSwitch(originalJnts, wristPos, ikJnts, fkJnts, controlSize, switchColourValues)          
-                      
+            ikFkSwitchControl = createSwitch(originalJnts, wristPos, ikJnts, fkJnts, controlSize, switchColour)          
+
+            #fk Shoulder control##
+            cmds.addAttr(ikFkSwitchControl, longName="fkShoulderControl", attributeType="message")
+            cmds.connectAttr(fkControls[2] + ".message", ikFkSwitchControl + ".fkShoulderControl")
+            
+            #ik Shoulder joint
+            cmds.addAttr(ikFkSwitchControl, longName="ikShoulderJnt", attributeType="message")
+            cmds.connectAttr(ikJnts[2] + ".message", ikFkSwitchControl + ".ikShoulderJnt")
+            
+            #fk Elbow control##
+            cmds.addAttr(ikFkSwitchControl, longName="fkElbowControl", attributeType="message")
+            cmds.connectAttr(fkControls[1] + ".message", ikFkSwitchControl + ".fkElbowControl")
+
+            #ik Elbow joint##
+            cmds.addAttr(ikFkSwitchControl, longName="ikElbowJnt", attributeType="message")
+            cmds.connectAttr(ikJnts[1] + ".message", ikFkSwitchControl + ".ikElbowJnt")
+            
+            #fk Wrist control##
+            cmds.addAttr(ikFkSwitchControl, longName="fkWristControl", attributeType="message")
+            cmds.connectAttr(fkControls[0] + ".message", ikFkSwitchControl + ".fkWristControl")
+
+            #ik Wrist joint##
+            cmds.addAttr(ikFkSwitchControl, longName="ikWristJnt", attributeType="message")
+            cmds.connectAttr(ikJnts[0] + ".message", ikFkSwitchControl + ".ikWristJnt")
+            
+            #ik Wrist control
+            cmds.addAttr(ikFkSwitchControl, longName="ikWristControl", attributeType="message")
+            cmds.connectAttr(ikControls[0] + ".message", ikFkSwitchControl + ".ikWristControl")
+
+            #ik Elbow control
+            cmds.addAttr(ikFkSwitchControl, longName="ikElbowControl", attributeType="message")
+            cmds.connectAttr(ikControls[1] + ".message", ikFkSwitchControl + ".ikElbowControl")                            
+
+            #offset Locator
+            cmds.addAttr(ikFkSwitchControl, longName="ikOffsetLocator", attributeType="message")
+            cmds.connectAttr(offsetLctr + ".message", ikFkSwitchControl + ".ikOffsetLocator")   
+                                                  
             applySkinning(originalJnts, ikFkSwitchControl)  
             # Drive the visibility of the fk and ik controls with the switch control
     
@@ -72,7 +124,7 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
             #sets the axis, attributes, and visibility
             
             axis = ('x', 'y', 'z')
-            attributes = ('t', 'r', 's')
+            attributes = ('r', 's')
             visibility = ('v')
             
             # Creates a list of all joints / controls
@@ -99,7 +151,7 @@ def createIkFk(radiusField, basicColourValues, switchColourValues):
                             cmds.setAttr(ikFkSwitchControl+'.'+at+ax, lock=1, keyable=0)
                             cmds.setAttr(ikFkSwitchControl+'.'+vis, lock=1, keyable=0)
 
-def createFK(originalJnts, wristPos, controlSize, basicColourValues):    
+def createFK(originalJnts, wristPos, controlSize, basicColour):    
     # The duplication station starts here
     #originalJnts[wrist, elbow, shoulder]
     shoulderFk = cmds.duplicate(originalJnts[2], name=originalJnts[2]+'Fk', renameChildren=1)    
@@ -128,9 +180,9 @@ def createFK(originalJnts, wristPos, controlSize, basicColourValues):
     # Build fk controls
         
     # Creates circles and groups them
-    shoulderFkControl, shoulderFkControlGrp = createControl(shoulderFkJnt, basicColourValues, controlSize)
-    elbowFkControl, elbowFkControlGrp = createControl(elbowFkJnt, basicColourValues, controlSize)    
-    wristFkControl, wristFkControlGrp = createControl(wristFkJnt, basicColourValues, controlSize)             
+    shoulderFkControl, shoulderFkControlGrp = createControl(shoulderFkJnt, basicColour, controlSize)
+    elbowFkControl, elbowFkControlGrp = createControl(elbowFkJnt, basicColour, controlSize)    
+    wristFkControl, wristFkControlGrp = createControl(wristFkJnt, basicColour, controlSize)             
     
     # Match the groups transforms to the joints
     
@@ -150,11 +202,11 @@ def createFK(originalJnts, wristPos, controlSize, basicColourValues):
     cmds.parent (elbowFkControlGrp, shoulderFkControl)
     
     fkJnts = [wristFkJnt, elbowFkJnt, shoulderFkJnt]
-    fkControls = [elbowFkControl, shoulderFkControl, wristFkControl]
+    fkControls = [wristFkControl, elbowFkControl, shoulderFkControl]
     return fkJnts, fkControls
 
 
-def createIK(originalJnts, wristPos, fkControls, controlSize, basicColourValues):    
+def createIK(originalJnts, wristPos, fkControls, controlSize, colourValues):    
     # Duplicate arm for IK.
  
     # The duplication station starts here
@@ -189,7 +241,7 @@ def createIK(originalJnts, wristPos, fkControls, controlSize, basicColourValues)
     ikHandle = cmds.ikHandle(startJoint=shoulderIkJnt, endEffector=wristIkJnt, sol='ikRPsolver', name=originalJnts[0]+'IkHandle')[0]
     
     # Creates a circle and groups it    
-    wristIkControl, wristIkControlGrp = createControl(wristIkJnt, basicColourValues, controlSize)
+    wristIkControl, wristIkControlGrp = createControl(wristIkJnt, colourValues["control"], controlSize)
        
     # Match the groups transforms to the joints
     
@@ -204,9 +256,11 @@ def createIK(originalJnts, wristPos, fkControls, controlSize, basicColourValues)
     cmds.orientConstraint(wristIkControl, wristIkJnt)
    
     # create an elbow ik control and create pole vector constraint
+    elbowIkControl = createCubeControl(elbowIkJnt+'Control', controlSize/3)   
+    changeColour(elbowIkControl, colourValues["pole"])
+    elbowIkControlGrp = cmds.group(elbowIkControl, name=elbowIkControl+'Grp') 
     
-    # Creates a circle and groups it
-    elbowIkControl, elbowIkControlGrp = createControl(elbowIkJnt, basicColourValues, controlSize)          
+    #elbowIkControl, elbowIkControlGrp = createControl(elbowIkJnt, basicColour, controlSize)          
     
     # Match the groups transforms to the joints
     
@@ -244,18 +298,18 @@ def createIK(originalJnts, wristPos, fkControls, controlSize, basicColourValues)
     
     cmds.matchTransform(offsetLctr, elbowIkControl)
     ikJnts = [wristIkJnt, elbowIkJnt, shoulderIkJnt]
-    ikControls = [elbowIkControl, wristIkControl]        
+    ikControls = [wristIkControl, elbowIkControl]        
     return ikJnts, ikControls, offsetLctr, ikHandle
 
 
-def createSwitch(originalJnts, wristPos, ikJnts, fkJnts, controlSize, switchColourValues):
+def createSwitch(originalJnts, wristPos, ikJnts, fkJnts, controlSize, switchColour):
     # Create the Ik/Fk Switch control and group it
     
     ikFkSwitchDistance = (-2/3)
     ikFkSwitchControlZ = wristPos * ikFkSwitchDistance
     ikFkSwitchControl = cmds.circle(degree=1, name=originalJnts[0]+'IkFkSwitchControl', radius = controlSize)[0]
     ikFkSwitchControlGrp = cmds.group(ikFkSwitchControl, name=ikFkSwitchControl+'Grp')
-    changeColour(ikFkSwitchControl, switchColourValues)
+    changeColour(ikFkSwitchControl, switchColour)
     
     # Match the groups transforms to the joints
     
@@ -266,7 +320,8 @@ def createSwitch(originalJnts, wristPos, ikJnts, fkJnts, controlSize, switchColo
     
     # Add a custom attribute
     
-    cmds.addAttr(ikFkSwitchControl, keyable=1, longName='ikFkSwitch', defaultValue=1.0, minValue=0.0, maxValue=1.0, attributeType='float')
+    cmds.addAttr(ikFkSwitchControl, keyable=1, longName='ikFkSwitch', defaultValue=1.0, minValue=0.0, maxValue=1.0, attributeType='float')    
+    
     return ikFkSwitchControl
 
 def setupVisibility(ikControls, fkControls, ikFkSwitchControl):
@@ -352,16 +407,15 @@ def changeColour(circleName, colourValues):
     cmds.setAttr(shapeNode + ".overrideEnabled", 1)
     cmds.setAttr(shapeNode + ".overrideColorRGB", colourValues[0],colourValues[1],colourValues[2])
 
-def newColourSwatch(canvas):
+def newColourSwatch(canvas, key, colourDict):
     cmds.colorEditor()
     
     if cmds.colorEditor(query=True, result=True):
         values = cmds.colorEditor(query=True, rgb=True)
         
-        # Update the canvas color
         cmds.canvas(canvas, edit=True, rgbValue=values)
         
-        return values
+        colourDict[key] = values  # 🔥 THIS is the important part
         
 ########FUNCTION TO CREATE THE WINDOW#######
 ## This function creates a window and calls the functions above
@@ -397,27 +451,49 @@ def createWindow():
         columnAttach=([1, 'right', 5], [2, 'left', 5]),
         parent=mainLayout
     )
-    
+      
     cmds.text(label='  Control Size:', align='right')
     radiusField = cmds.intField(width=40, value = 1)
-       
+   
     cmds.text(label='  Control Colour:', align='right')
-    basicColourValues = (0, 0, 0.5)    
-    colourCanvas01  = cmds.canvas(width=40, rgbValue=(basicColourValues), pressCommand=lambda *args: newColourSwatch(colourCanvas01))
+    basicColourValues = (0.05, 0, 0.5)    
+    colourCanvas01 = cmds.canvas(
+        width=40,
+        rgbValue=basicColourValues,
+        pressCommand=lambda *args: newColourSwatch(colourCanvas01, "control", colourValues)
+    )
+            
+    cmds.text(label='  Switch Colour:', align='right')
+    switchColourValues = (0, 0.3, 0)
+    colourCanvas02 = cmds.canvas(
+        width=40,
+        rgbValue=switchColourValues,
+        pressCommand=lambda *args: newColourSwatch(colourCanvas02, "switch", colourValues)
+    )
     
-    cmds.text(label='  Control SwitchColour:', align='right')
-    switchColourValues = (0, 0.7, 0)
-    colourCanvas02  = cmds.canvas(width=40, rgbValue=(switchColourValues), pressCommand=lambda *args: newColourSwatch(colourCanvas02))
-    
+    cmds.text(label='  Polevector Colour:', align='right')
+    poleColourValues = (0.55, 0.25, 0)      
+    colourCanvas03 = cmds.canvas(
+        width=40,
+        rgbValue=poleColourValues,
+        pressCommand=lambda *args: newColourSwatch(colourCanvas03, "pole", colourValues)
+    )  
+
+    colourValues = {
+        "control": basicColourValues,
+        "switch": switchColourValues,
+        "pole": poleColourValues
+    }  
+                
     cmds.button(
         label="Create Single Control", parent= mainLayout,
-        command=lambda *args: createSingleControl(radiusField, basicColourValues)
+        command=lambda *args: createSingleControl(radiusField, colourValues)
     )   
     
     cmds.separator(height=8, style="in", parent=mainLayout)        
     cmds.button(
         label="Create IK FK", parent= mainLayout,
-        command=lambda *args: createIkFk(radiusField, basicColourValues, switchColourValues)
+        command=lambda *args: createIkFk(radiusField, colourValues)
     )          
       
     cmds.showWindow(windowName)
