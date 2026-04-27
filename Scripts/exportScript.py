@@ -1,7 +1,7 @@
 import maya.cmds as cmds
 import os
 
-EXPORT_PATH_OPTIONVAR = "OBJExporter_LastExportPath"
+exportPath_OPTIONVAR = "OBJExporter_LastExportPath"
 
 ########FUNCTION TO CHANGE A PIVOT#######
 ## Calls changePivotHelper
@@ -9,14 +9,13 @@ def changePivot(pivotRadio):
     pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)
     sel = cmds.ls(selection=True, long=True)
     
-    print(pivotResults)
     if not sel:
         cmds.warning('No objects were selected')
         return
         
     for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        changePivotHelper(pivotResults, obj_name)
+        objName = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
+        changePivotHelper(pivotResults, objName)
     
     return
     
@@ -43,14 +42,13 @@ def changePivotHelper(pivotResults, object):
 def checkGEO(checkBoxes):               
     sel = cmds.ls(selection=True, long=True)
     
-    #print(pivotResults)
     if not sel:
         cmds.warning('No objects were selected')
         return
         
     for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        checkGEOHelper(checkBoxes, obj_name)
+        objName = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
+        checkGEOHelper(checkBoxes, objName)
     
     return
 
@@ -111,12 +109,13 @@ def checkGEOHelper(checkBoxes, object, mode="manual"):
             
 ########FUNCTION TO EXPORT #######
 ## This function requires a export path and pivot radio to query
-def export_Objects(filePath, pivotRadio, checkBoxes):
-    export_path = cmds.textField(filePath, query=True, text=True)
+def exportObjects(filePath, pivotRadio, checkBoxes, exportRadio):
+    exportPath = cmds.textField(filePath, query=True, text=True)
     pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)    
+    exportType = cmds.radioButtonGrp(exportRadio, query=True, select=True)
         
     ########PRELIMINARY CHECKS#######
-    if not export_path:
+    if not exportPath:
         cmds.warning("Please select an export directory.")
         return
             
@@ -127,11 +126,11 @@ def export_Objects(filePath, pivotRadio, checkBoxes):
 
     invalidObjects = {} #Check for invalid objects
     for selectedObjects in sel:
-        obj_name = selectedObjects.split("|")[-1]
-        issues = checkGEOHelper(checkBoxes, obj_name, "validate")
+        objName = selectedObjects.split("|")[-1]
+        issues = checkGEOHelper(checkBoxes, objName, "validate")
 
         if issues:
-            invalidObjects[obj_name] = issues
+            invalidObjects[objName] = issues
 
     if invalidObjects:
         cmds.warning("Export aborted: geometry issues detected.")
@@ -139,9 +138,9 @@ def export_Objects(filePath, pivotRadio, checkBoxes):
                 
     for selectedObjects in sel:
         ##Create the duplicate and transfer the name
-        obj_name = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name.
-        tempRename = cmds.rename(selectedObjects, obj_name + "_")
-        duplicate = cmds.duplicate(tempRename, name=obj_name)[0]       
+        objName = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name.
+        tempRename = cmds.rename(selectedObjects, objName + "_")
+        duplicate = cmds.duplicate(tempRename, name=objName)[0]       
          
         hasParent=cmds.listRelatives(selectedObjects, parent=True)                  
         if hasParent:
@@ -158,33 +157,42 @@ def export_Objects(filePath, pivotRadio, checkBoxes):
         cmds.select(duplicate, replace=True)
         
         ########EXPORT#######
-        export_file = os.path.join(export_path, obj_name + ".fbx")
-        
+        print(exportType)
+        if (exportType == 1):
+            cmds.loadPlugin("fbxmaya") 
+            suffix = ".fbx"
+            fileType = "FBX export"           
+        else:
+            cmds.loadPlugin('objExport')
+            suffix = ".obj"
+            fileType = "OBJexport"
+                                   
+        exportFile = os.path.join(exportPath, objName + suffix)
         try:
             cmds.file(
-                export_file,
+                exportFile,
                 force=True,
                 options="v=0;",
-                typ="FBX export",
+                type=fileType,
                 exportSelected=True
             )
-            print(f"Successfully exported selected objects to: {export_path}")
+            print(f"Successfully exported selected objects to: {exportPath}")
         except RuntimeError as e:
             print(f"Error during FBX export: {e}")
         
         #######CLEANUP#######
         cmds.delete(duplicate)
-        cmds.rename(tempRename, obj_name)
-    cmds.optionVar(stringValue=(EXPORT_PATH_OPTIONVAR, export_path))
+        cmds.rename(tempRename, objName)
+    cmds.optionVar(stringValue=(exportPath_OPTIONVAR, exportPath))
     
 ########FUNCTION TO FIND A FOLDER#######
 ## This function requires a text field and will open a folder browser
-def browseForFolder(text_field):
+def browseForFolder(textField):
     folder = cmds.fileDialog2(fileMode=3, dialogStyle=2)
 
     if folder:
-        cmds.textField(text_field, edit=True, text=folder[0])
-        cmds.optionVar(stringValue=(EXPORT_PATH_OPTIONVAR, folder[0]))
+        cmds.textField(textField, edit=True, text=folder[0])
+        cmds.optionVar(stringValue=(exportPath_OPTIONVAR, folder[0]))
 
 ########FUNCTION TO CREATE THE WINDOW#######
 ## This function creates a window and calls the functions above
@@ -197,9 +205,9 @@ def createWindow():
     if cmds.window(windowName, exists=True):
         cmds.deleteUI(windowName)
     
-    window_width = 400
-    window_height = 300 
-    cmds.window(windowName, title=windowName, widthHeight=(window_width, window_height), sizeable=False)  
+    windowWidth = 400
+    windowHeight = 310 
+    cmds.window(windowName, title=windowName, widthHeight=(windowWidth, windowHeight), sizeable=False)  
     
     #Creates The Window
     mainLayout = cmds.columnLayout( adjustableColumn=True )    
@@ -268,6 +276,19 @@ def createWindow():
         marginWidth=8,
         marginHeight=6,
         parent=mainLayout
+    )         
+
+    exportCol = cmds.rowColumnLayout(
+        numberOfColumns=2,
+        columnAttach=([1, 'right', 5], [2, 'left', 5]),
+        parent=mainLayout
+    )
+    cmds.text(label='  Export Type:', align='right')   
+     
+    exportRadio = cmds.radioButtonGrp(
+        labelArray2=['FBX', 'OBJ'],
+        numberOfRadioButtons=2,
+        select=0
     )
     
     exportCol = cmds.rowColumnLayout(
@@ -278,8 +299,8 @@ def createWindow():
     
     cmds.text(label='  Export Path:', align='right')
     exportPathField = cmds.textField(width=210)
-    if cmds.optionVar(exists=EXPORT_PATH_OPTIONVAR):
-        savedPath = cmds.optionVar(query=EXPORT_PATH_OPTIONVAR)
+    if cmds.optionVar(exists=exportPath_OPTIONVAR):
+        savedPath = cmds.optionVar(query=exportPath_OPTIONVAR)
         cmds.textField(exportPathField, edit=True, text=savedPath)
     
     cmds.button(
@@ -289,7 +310,7 @@ def createWindow():
   
     cmds.button(
         label="Export Objects", parent= mainLayout,
-        command=lambda *args: export_Objects(exportPathField, pivotRadio, checkBoxes)
+        command=lambda *args: exportObjects(exportPathField, pivotRadio, checkBoxes, exportRadio)
     )          
       
     cmds.showWindow(windowName)
