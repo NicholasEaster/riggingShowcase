@@ -22,7 +22,6 @@ def changeColour(providedCircle, colourValues):
 ## Returns the created joint control and its group.
 ## Uses the changeColour helper function.
 def createControl(originalJnt, colour, controlSize):
-    print(colour)
     jntControl = cmds.circle(name=originalJnt+'Control', radius=controlSize, nr=(1, 0, 0))[0]    
     changeColour(jntControl, colour)
     jntControlGrp = cmds.group(jntControl, name=jntControl+'Grp') 
@@ -196,7 +195,7 @@ def createFK(originalJnts, wristPos, controlSize, basicColour):
 ## This function creates the ik arm, including the controls, constraints, joints, and pole vector.
 
 ## It takes a list corresponding to the original joints of the arm, the wrist position, the control sizes, the control colours, and the world control.
-## Uses the createControl and setupFollowSpace helper functions.
+## Uses the createControl, moveCtrlBehind,  and setupFollowSpace helper functions.
 ## Returns the created ik controls and joints in a list   
 def createIK(originalJnts, wristPos, controlSize, colourValues, worldCtrl):    
     # The duplication station starts here
@@ -245,11 +244,9 @@ def createIK(originalJnts, wristPos, controlSize, colourValues, worldCtrl):
     cmds.matchTransform(elbowIkControlGrp, elbowIkJnt) 
 
     # Find the new location of the elbow control
-    elbowDistance = (-2/3)
-    elbowDistanceZ = wristPos * (elbowDistance)
-    
-    cmds.move(0,0,elbowDistanceZ, elbowIkControlGrp, relative=1, objectSpace=1)
-          
+    targetPosition = moveCtrlBehind(elbowIkJnt, shoulderIkJnt, elbowIkJnt, wristIkJnt)    
+    cmds.xform(elbowIkControlGrp, ws=True, t=(targetPosition.x, targetPosition.y, targetPosition.z))
+              
     # Create the pole vector contstraint
     cmds.poleVectorConstraint(elbowIkControl, createdIkHandle)
 
@@ -268,6 +265,60 @@ def createIK(originalJnts, wristPos, controlSize, colourValues, worldCtrl):
     }          
     return ikJnts, ikControls, createdIkHandle
 
+######## FUNCTION TO MOVE A CONTROL BEHIND A JOINT ########
+## This function is used to ensure the pole vector and switch are created behind the arm, regardless of the joint orientation.
+
+## Takes a target for the joint as well as the shoulder, elbow, and wrist
+## Returns a vector target coresponding to the target location
+def moveCtrlBehind(target, shoulder, elbow, wrist):
+    import maya.api.OpenMaya as om      
+    # Get world positions
+    wsVector = getWorldspaceVector(shoulder, elbow, wrist)
+
+    # Create the vectors between the shoulder to the elbow and wrist
+    shoulderToWrist =  wsVector["wrist"] -  wsVector["shoulder"]
+    shoulderToElbow =  wsVector["elbow"] -  wsVector["shoulder"]
+
+    # Project elbow onto shoulder to wrist line
+    projection = shoulderToWrist.normal() * (shoulderToElbow * shoulderToWrist.normal())
+    projectedPoint =  wsVector["shoulder"] + projection
+
+    # This gives the pole vector direction
+    poleVectorDir = ( wsVector["elbow"] - projectedPoint).normal()    
+
+    # Get the length of the arm
+    shoulderToElbowLen = (wsVector["elbow"] - wsVector["shoulder"]).length()
+    elbowToWristLen = (wsVector["wrist"] - wsVector["elbow"]).length()    
+    armLength = shoulderToElbowLen + elbowToWristLen
+    
+    # Set the distance to allow for different sizes of skeletons
+    distance = armLength * 0.5   # tweakable multiplier
+    
+    # The final position is now the current location but translated based on the joint orientation
+    wsTarget = om.MVector(cmds.xform(target,    q=True, ws=True, t=True))        
+    targetPosition =  wsTarget - (poleVectorDir * (distance * -1))
+
+    return targetPosition
+
+######## FUNCTION TO GET THE WORLD SPACE VECTORS ########
+## This function gets the shoulder, elbow and wrist world space transforms.
+
+## Takes a shoulder, elbow, and wrist
+## Returns a dictionary of vectors.
+def getWorldspaceVector(shoulder, elbow, wrist):
+    import maya.api.OpenMaya as om        
+    # Get world positions
+    wsShoulder = om.MVector(cmds.xform(shoulder, q=True, ws=True, t=True))
+    wsElbow    = om.MVector(cmds.xform(elbow,    q=True, ws=True, t=True))
+    wsWrist    = om.MVector(cmds.xform(wrist,    q=True, ws=True, t=True))    
+    
+    wsVectors = {
+        "shoulder": wsShoulder,
+        "elbow": wsElbow,
+        "wrist": wsWrist
+    }
+    return wsVectors
+        
 ######## FUNCTION TO FOLLOWING ATTRIBUTE ########
 ## This function adds an extra attribute to allow the control to follow a target joint or remain in world space.
 
@@ -320,7 +371,7 @@ def setupFollowSpace(givenCtrl, givenCtrlGrp, worldTarget, followTarget):
     
     cmds.connectAttr(cond + ".outColorR", reverse + ".inputX")
     cmds.connectAttr(reverse + ".outputX", worldWeight)
-    
+        
 ######## FUNCTION TO CREATE THE IK FK SWITCH ########
 ## This creates the switch control and adds new attributes to it in order to switch between ik and fk as well as match them.
 
@@ -329,8 +380,6 @@ def setupFollowSpace(givenCtrl, givenCtrlGrp, worldTarget, followTarget):
 ## Returns the switch control 
 def createSwitch(originalJnts, wristPos, ikJnts, fkControls, ikControls, controlSize, switchColour, worldCtrl):
     # Create the Ik/Fk Switch control and group it    
-    ikFkSwitchDistance = (-2/3)
-    ikFkSwitchControlZ = wristPos * ikFkSwitchDistance
     ikFkSwitchControl = cmds.circle(degree=1, name=originalJnts["wrist"]+'IkFkSwitchControl', radius = controlSize)[0]
     ikFkSwitchControlGrp = cmds.group(ikFkSwitchControl, name=ikFkSwitchControl+'Grp')
     changeColour(ikFkSwitchControl, switchColour)
@@ -338,7 +387,11 @@ def createSwitch(originalJnts, wristPos, ikJnts, fkControls, ikControls, control
     # Match the groups transforms to the joints
     
     cmds.matchTransform(ikFkSwitchControlGrp, ikJnts["wrist"])
-    cmds.move(0,0,ikFkSwitchControlZ, ikFkSwitchControl, relative=1, objectSpace=1)
+    
+    #transform the control behind the joints.
+    targetPosition = moveCtrlBehind(originalJnts["wrist"], originalJnts["shoulder"], originalJnts["elbow"], originalJnts["wrist"])    
+    cmds.xform(ikFkSwitchControlGrp, ws=True, t=(targetPosition.x, targetPosition.y, targetPosition.z))      
+    
     cmds.makeIdentity (ikFkSwitchControl, apply=1, translate=1, rotate=1, scale=1, normal=0, preserveNormals=1)
     
     # Add a custom attribute   
@@ -594,29 +647,24 @@ def findJoints():
 ######## FUNCTION TO FINE THE NEW POLEVECTOR POSITION ########
 ## This function calculates where the pole vector should be positioned to be in the same position as the fk arm.
 
-## Takes a pole vector, the fk shoulder, elbow, and wrist      
-def findFkLocatorPosition(poleVector, shoulder, elbow, wrist):
-    import maya.api.OpenMaya as om
-    
-    #Find the worldspace positions of the shoulder, elbow, and wrist.
-    wsShoulder = om.MVector(cmds.xform(shoulder, q=True, ws=True, t=True))
-    wsElbow = om.MVector(cmds.xform(elbow, q=True, ws=True, t=True))
-    wsWrist = om.MVector(cmds.xform(wrist, q=True, ws=True, t=True))
-    
+## Takes a pole vector, the fk shoulder, elbow, and wrist  
+## Uses getWorldspaceVector helper function.     
+def findFkLocatorPosition(poleVector, shoulder, elbow, wrist):    
+    wsVector = getWorldspaceVector(shoulder, elbow, wrist)
     # midpoint between shoulder and wrist
-    mid = (wsShoulder + wsWrist) * 0.5
+    mid = (wsVector["shoulder"] + wsVector["wrist"]) * 0.5
     
     # direction from midpoint to elbow
-    direction = (wsElbow - mid).normal()
+    direction = (wsVector["elbow"] - mid).normal()
     
     # distance based on arm length
-    dist = (wsWrist - wsShoulder).length() * 0.5
+    dist = ( wsVector["wrist"] - wsVector["shoulder"]).length() * 0.5
     
-    finalPos = wsElbow + (direction * dist)
+    finalPos = wsVector["elbow"] + (direction * dist)
     
     # Transform the poleVector into place
     cmds.xform(poleVector, ws=True, t=(finalPos.x, finalPos.y, finalPos.z))        
-
+    
 ###############################################################
 ####################### WINDOW CREATION #######################
 ###############################################################
@@ -636,17 +684,14 @@ def createWindow():
         cmds.deleteUI(windowName)
     
     windowWidth = 275
-    windowHeight = 300 
+    windowHeight = 330 
     cmds.window(windowName, title=windowName, widthHeight=(windowWidth, windowHeight), sizeable=False)  
     
-    #Creates The Window
     mainLayout = cmds.columnLayout( adjustableColumn=True )    
-    
-    ####### CONTROL SETTINGS #######
-    cmds.separator(height=8, style="in", parent=mainLayout)
-    
+    cmds.separator(height=8, style="in", parent=mainLayout)       
+    ####### CONTROL SETTINGS #######    
     controlSettingsFrame = cmds.frameLayout(
-        label="Controls",
+        label="Control Settings",
         collapsable=False,
         marginWidth=8,
         marginHeight=3,
@@ -659,7 +704,7 @@ def createWindow():
         parent=mainLayout
     )
       
-    cmds.text(label='  Control Size:', align='right')
+    cmds.text(label='  Control Size:', align='right', annotation="The size of the controls for the joints.")
     radiusField = cmds.intField(width=40, value = 1)
    
     cmds.text(label='  Control Colour:', align='right')
@@ -667,14 +712,16 @@ def createWindow():
     colourCanvas01 = cmds.canvas(
         width=40,
         rgbValue=basicColourValues,
+        annotation="The colour for the normal controls.",
         pressCommand=lambda *args: newColourSwatch(colourCanvas01, "control", colourValues)
     )
-            
-    cmds.text(label='  Switch Colour:', align='right')
+    spacer="                        "            
+    cmds.text(label=spacer+'Switch Colour:', align='right')
     switchColourValues = (0, 0.4, 0)
     colourCanvas02 = cmds.canvas(
         width=40,
         rgbValue=switchColourValues,
+        annotation="The colour for the IK/FK switch.",        
         pressCommand=lambda *args: newColourSwatch(colourCanvas02, "switch", colourValues)
     )
     
@@ -683,6 +730,7 @@ def createWindow():
     colourCanvas03 = cmds.canvas(
         width=40,
         rgbValue=poleColourValues,
+        annotation="The colour for the pole vector.",        
         pressCommand=lambda *args: newColourSwatch(colourCanvas03, "pole", colourValues)
     )  
 
@@ -694,14 +742,15 @@ def createWindow():
     }  
                 
     cmds.button(
-        label="Create Single Control", parent= mainLayout,
+        label="Create Single Control", parent= mainLayout, annotation="Select a joint: create a control for it and parent it to the joint.",
         command=lambda *args: createSingleControl(radiusField, colourValues)
     )   
+    cmds.text(label="",parent= mainLayout)
 
     ####### IKFK MATCHER #######
     cmds.separator(height=8, style="in", parent=mainLayout)    
     IkFkMatcherFrame = cmds.frameLayout(
-        label="IKFK_Matcher",
+        label="IK/FK Matcher",
         collapsable=False,
         marginWidth=8,
         marginHeight=3,
@@ -712,31 +761,32 @@ def createWindow():
         columnAttach=([1, 'right', 5], [2, 'left', 5]),
         parent=mainLayout
     )
-    cmds.text(label='  IKFK Matcher:', align='right')   
+    cmds.text(label='      Match:', align='right')   
      
     matchingRadio = cmds.radioButtonGrp(
         labelArray2=['IK->FK', 'FK->IK'],
+        annotation="Matches the arm from the first argument to the second argument.",
         numberOfRadioButtons=2,
         select=0
     )
-    fk_to_ik_button = cmds.button(label='Match', parent=mainLayout,
-                command=lambda *args: ikFkMatcher(matchingRadio))  
-                    
+    fk_to_ik_button = cmds.button(label='Match Pose', parent=mainLayout, annotation="Select created the switch: Match the pose between IK and FK.",
+                command=lambda *args: ikFkMatcher(matchingRadio))
+                
+    cmds.text(label="",parent= mainLayout)                    
     ####### IKFK CREATOR #######
     cmds.separator(height=8, style="in", parent=mainLayout)
     createIkFkFrame = cmds.frameLayout(
-        label="IKFK_Creator",
+        label="IK/FK Creator",
         collapsable=False,
         marginWidth=8,
         marginHeight=3,
         parent=mainLayout
     )         
     cmds.button(
-        label="Create IK FK", parent= mainLayout,
+        label="Create IK FK", parent= mainLayout, annotation="Select a joint with 2 parents: create an IK/FK chain between the joints.",
         command=lambda *args: createIkFk(radiusField, colourValues)
-    )          
-    cmds.separator(height=8, style="in", parent=mainLayout)              
-                  
+    )                    
+    cmds.separator(height=8, style="in", parent=mainLayout)                     
     cmds.showWindow(windowName)
 
 ######## FUNCTION TO APPLY A NEW COLOUR TO THE CANVAS ########

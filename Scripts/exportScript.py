@@ -1,10 +1,19 @@
 import maya.cmds as cmds
 import os
 
+#Create a global variable to store the previous folder selected for export.
 exportPath_OPTIONVAR = "OBJExporter_LastExportPath"
 
-########FUNCTION TO CHANGE A PIVOT#######
-## Calls changePivotHelper
+###############################################################
+####################### PIVOT PLANET ##########################
+###############################################################
+
+
+######## FUNCTION TO CHANGE A PIVOT ########
+## This function will change the pivot of selected object(s) by calling the helper function.
+
+## It takes a pivot result contained in a radio button.
+## Uses the changePivotHelper helper function.
 def changePivot(pivotRadio):
     pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)
     sel = cmds.ls(selection=True, long=True)
@@ -15,30 +24,42 @@ def changePivot(pivotRadio):
         
     for selectedObjects in sel:
         objName = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        changePivotHelper(pivotResults, objName)
+        changePivotHelper(pivotResults, objName)        
     
-    return
-    
-########FUNCTION TO HELP CHANGE A PIVOT#######
-## This function works on a specific object provided 
+######## FUNCTION TO HELP MODIFY A PIVOT ########
+## This function will set the pivot to be either the bottom left or the bottom center based on user preference.
+
+## It takes a pivot result as well as an object to apply the transformations to.
 def changePivotHelper(pivotResults, object):
     if pivotResults == 1:
         bbox = cmds.xform(object, query=True, boundingBox=True, worldSpace=True) #Get the object bounds
         x = bbox[0]
         y = bbox[1]
         z = bbox[5]
-        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom left
+        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom left   
     elif pivotResults == 3:         
+        bbox = cmds.xform(object, query=True, boundingBox=True, worldSpace=True) #Get the object bounds
+        x = (bbox[0] + bbox[3]) / 2.0
+        y = (bbox[1] + bbox[4]) / 2.0
+        z = (bbox[2] + bbox[5]) / 2.0
+        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom center   
+    elif pivotResults == 4:         
         bbox = cmds.xform(object, query=True, boundingBox=True, worldSpace=True) #Get the object bounds
         x = (bbox[0] + bbox[3]) / 2.0
         y = bbox[1]
         z = (bbox[2] + bbox[5]) / 2.0
-        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom center
-    
-    return
+        cmds.move(x, y, z, object+".scalePivot", object+".rotatePivot", absolute=True) #Move the pivot the the bottom center                
 
-########FUNCTION TO CHECK MODEL GEOMETRY#######
-## Calls checkGEOHelper
+###############################################################
+######################## GEO CHECKER ##########################
+###############################################################
+
+
+######## FUNCTION TO CHECK GEO ########
+## This function will check the geometry of an object by calling the geo helper function.
+
+## It takes the checkBoxes result given by the user.
+## Uses the checkGEOHelper helper function.
 def checkGEO(checkBoxes):               
     sel = cmds.ls(selection=True, long=True)
     
@@ -48,12 +69,14 @@ def checkGEO(checkBoxes):
         
     for selectedObjects in sel:
         objName = selectedObjects.split("|")[-1] #This is needed because the default is Parent name|child name. 
-        checkGEOHelper(checkBoxes, objName)
-    
-    return
+        checkGEOHelper(checkBoxes, objName)        
 
-########FUNCTION TO HELP CHECK GEO#######
-## This function works on a specific object provided 
+######## FUNCTION TO HELP CHECK GEO ########
+## This function will perform different checks on the selected object based on what the user selects.
+## If the function is called by the exporter as apposed to manually through the button, it is hard coded to check the necessary components.
+
+## It takes the checkBoxes result given by the user.
+## Returns any issues found.
 def checkGEOHelper(checkBoxes, object, mode="manual"):
     cmds.select(object, r=True) #Select the object just in case
     
@@ -106,9 +129,19 @@ def checkGEOHelper(checkBoxes, object, mode="manual"):
             cmds.warning(f"{object} issues: {', '.join(issues)}") #Format the warning                               
     return issues
 
-            
-########FUNCTION TO EXPORT #######
-## This function requires a export path and pivot radio to query
+
+###############################################################
+##################### EXPORT CENTRAL ##########################
+###############################################################
+
+
+######## FUNCTION TO EXPORT AN OBJECT ########
+## This function will take a given object(s), modify the pivots based on the user's choice, and check the geometry for issues.
+## It will then duplicate the object, remove any of its groups, and move the object to the world origin.
+## The duplicated object is then exported and deleted afterwards
+
+## It takes a filePath as well as all of the radio buttons provided by the user
+## Uses the checkGEOHelper and changePivotHelper helper functions.     
 def exportObjects(filePath, pivotRadio, checkBoxes, exportRadio):
     exportPath = cmds.textField(filePath, query=True, text=True)
     pivotResults = cmds.radioButtonGrp(pivotRadio, query=True, select=True)    
@@ -157,7 +190,6 @@ def exportObjects(filePath, pivotRadio, checkBoxes, exportRadio):
         cmds.select(duplicate, replace=True)
         
         ########EXPORT#######
-        print(exportType)
         if (exportType == 1):
             cmds.loadPlugin("fbxmaya") 
             suffix = ".fbx"
@@ -185,8 +217,16 @@ def exportObjects(filePath, pivotRadio, checkBoxes, exportRadio):
         cmds.rename(tempRename, objName)
     cmds.optionVar(stringValue=(exportPath_OPTIONVAR, exportPath))
     
-########FUNCTION TO FIND A FOLDER#######
-## This function requires a text field and will open a folder browser
+###############################################################
+####################### WINDOW CREATION #######################
+###############################################################
+
+
+######## FUNCTION TO BROWSE FOR A FOLDER ########
+## This function will open up the file directory built into maya.
+## If something is then selected, the textfield is updated with the new path.
+
+## It takes a textField that will store the folder location.
 def browseForFolder(textField):
     folder = cmds.fileDialog2(fileMode=3, dialogStyle=2)
 
@@ -195,7 +235,9 @@ def browseForFolder(textField):
         cmds.optionVar(stringValue=(exportPath_OPTIONVAR, folder[0]))
 
 ########FUNCTION TO CREATE THE WINDOW#######
-## This function creates a window and calls the functions above
+## This function creates the window and the buttons needed to run the program.
+
+## Uses changePivot, checkGEO, browseForFolder, and exportObjects
 def createWindow():
     # Create Window  
     windowName = "OBJ_Exporter"
@@ -205,13 +247,12 @@ def createWindow():
     if cmds.window(windowName, exists=True):
         cmds.deleteUI(windowName)
     
-    windowWidth = 400
-    windowHeight = 310 
+    windowWidth = 425
+    windowHeight = 325 
     cmds.window(windowName, title=windowName, widthHeight=(windowWidth, windowHeight), sizeable=False)  
-    
-    #Creates The Window
+        
     mainLayout = cmds.columnLayout( adjustableColumn=True )    
-    
+    cmds.separator(height=8, style="in", parent=mainLayout)       
     #######PIVOT PLANET#######
     pivotFrame = cmds.frameLayout(
         label="Pivot Location",
@@ -223,14 +264,16 @@ def createWindow():
     pivotColumn = cmds.columnLayout(adjustableColumn=True, parent=pivotFrame)
 
     pivotRadio = cmds.radioButtonGrp(
-        labelArray3=["Bottom Left", "Custom", "Bottom Center"],
-        numberOfRadioButtons=3,
+        labelArray4=["Bottom Left", "Custom", "Centered", "Bottom Center"],
+        annotation="Change the pivot of an object, or keep the current pivot by selecting custom.",
+        columnWidth=([1,100], [2,90], [3,90]),
+        numberOfRadioButtons=4,
         select=2
     )
     
     #Start Pivot
     cmds.button(
-        label="Modify Pivot",parent= mainLayout,
+        label="Modify Pivot",parent= mainLayout, annotation="Object selected: modify the pivot of the selected object.", 
         command=lambda *args: changePivot(pivotRadio)
     )
     
@@ -255,13 +298,14 @@ def createWindow():
     
     checkBoxes = cmds.checkBoxGrp(
     labelArray4=["nonManifold", "Ngons", "Delete History", "Freeze Transforms"],
+    annotation="Verifies the mesh does not contain invalid geometry and can delete history or freeze the transforms.",    
     numberOfCheckBoxes=4,
     columnWidth4=[100,65,100,100]
     )
     
     #Start Cleanup
     cmds.button(
-        label="Check Objects",parent= mainLayout,
+        label="Check Objects",parent= mainLayout, annotation="Object selected: validate the object and optionally clean up the object.", 
         command=lambda *args: checkGEO(checkBoxes)
     )
     
@@ -283,11 +327,14 @@ def createWindow():
         columnAttach=([1, 'right', 5], [2, 'left', 5]),
         parent=mainLayout
     )
-    cmds.text(label='  Export Type:', align='right')   
+    
+    spacer="    "        
+    cmds.text(label=spacer+'Export Type:', align='right')   
      
     exportRadio = cmds.radioButtonGrp(
         labelArray2=['FBX', 'OBJ'],
         numberOfRadioButtons=2,
+        annotation="The type of exported file.",        
         select=0
     )
     
@@ -297,7 +344,7 @@ def createWindow():
         parent=mainLayout
     )
     
-    cmds.text(label='  Export Path:', align='right')
+    cmds.text(label=spacer+'Export Path:', align='right')
     exportPathField = cmds.textField(width=210)
     if cmds.optionVar(exists=exportPath_OPTIONVAR):
         savedPath = cmds.optionVar(query=exportPath_OPTIONVAR)
@@ -307,12 +354,14 @@ def createWindow():
         label="Browse...",
         command=lambda *args: browseForFolder(exportPathField)
     )
-  
+    
+    #Start Export  
     cmds.button(
-        label="Export Objects", parent= mainLayout,
+        label="Export Objects", parent= mainLayout, annotation="Object and folder selected: export the object to the given folder.", 
         command=lambda *args: exportObjects(exportPathField, pivotRadio, checkBoxes, exportRadio)
     )          
-      
+    cmds.separator(height=8, style="in", parent=mainLayout)   
+          
     cmds.showWindow(windowName)
     
 #main
