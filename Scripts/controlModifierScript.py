@@ -11,7 +11,6 @@ import maya.cmds as cmds
 ## It takes a circle as well a given specific colour to apply.
 def changeColour(providedCircle, colourValues):
     shapeNode = cmds.listRelatives(providedCircle, shapes=True,  fullPath=True)[0]
-    print(shapeNode)
     cmds.setAttr(shapeNode+ ".overrideRGBColors", 1)
     cmds.setAttr(shapeNode + ".overrideEnabled", 1)
     cmds.setAttr(shapeNode + ".overrideColorRGB", colourValues[0],colourValues[1],colourValues[2])
@@ -22,65 +21,74 @@ def changeColour(providedCircle, colourValues):
 ## It takes a joint in order to name the control, a radius, and a colour value specified by the user.
 ## Returns the created joint control and its group.
 ## Uses the changeColour helper function.
-def createControl(originalJnt, colour, controlSize, controlType, linear):
+def createControl(originalJnt, colour, controlSize, controlType, linear, sections):
    
-    jntControl = createControlType(originalJnt+"Control", controlSize, controlType, linear)
+    jntControl = createControlType(originalJnt+"Control", controlSize, controlType, linear, sections)
     
     changeColour(jntControl, colour)
     jntControlGrp = cmds.group(jntControl, name=jntControl+'Grp') 
                  
     return jntControl, jntControlGrp
 
-def createControlType(controlName, controlSize, controlType, linear):
+def createControlType(controlName, controlSize, controlType, linear, sectionValue):
     if controlType == 1:
         newCtrl = createNurbsCube(controlName, controlSize)
     elif controlType == 2:        
         newCtrl = createNurbsArrow(controlName, controlSize)
     elif controlType == 3:
         if (linear):
-            newCtrl = cmds.circle(name=controlName, radius=controlSize, nr=(1, 0, 0),degree=1)[0]
+            newCtrl = cmds.circle(name=controlName, radius=controlSize, nr=(1, 0, 0),degree=1, sections=sectionValue)[0]
         else:
-            newCtrl = cmds.circle(name=controlName, radius=controlSize, nr=(1, 0, 0),degree=3)[0]
+            newCtrl = cmds.circle(name=controlName, radius=controlSize, nr=(1, 0, 0),degree=3, sections=sectionValue)[0]
     return newCtrl
-        
+     
 ######## FUNCTION TO CREATE A SINGLE CONTROL########
 ## This function is used to create a single control and parents it to the selected joint.
 ## It allows the user to quickly create a control without needing to create the entire ik fk chain.
 
 ## It takes a radius and a colour value specified by the user.
 ## Uses the createControl helper function.
-def createSingleControl(radiusField, controlColour, newControlRadio, linearCheck):
+def createSingleControl(radiusField, controlColour, newControlRadio, linearCheck, sectionsField, arrowHeightField):
     #'Cube', 'Arrow', 'Circle'
     controlType = cmds.radioButtonGrp(newControlRadio, query=True, select=True)
     controlSize = cmds.intField(radiusField, query=True, value=True)
     linear = cmds.checkBox(linearCheck, query=True, value=True)
-    
+    sections = cmds.intField(sectionsField, query=True, value=True)
+    arrowHeight = cmds.intField(arrowHeightField, query=True, value=True)
+        
     selected = cmds.ls(selection=1, type='joint')
     
     if not selected:
         cmds.warning("You need to select a joint.")
     else: 
         jnt = cmds.ls(selection=1, type='joint')[0]   
-        jntControl, jntControlGrp = createControl(jnt, controlColour, controlSize, controlType, linear)
-        cmds.matchTransform(jntControlGrp, jnt)
+        jntControl, jntControlGrp = createControl(jnt, controlColour, controlSize, controlType, linear, sections)
+
+        jointPosition = cmds.xform(
+            jnt,
+            query=True,
+            worldSpace=True,
+            translation=True
+        )
+        jointRotation = cmds.xform(
+            jnt,
+            query=True,
+            worldSpace=True,
+            rotation=True
+        )
         
-        if (controlType == 2):
-            offsetArrow(1.5, jntControl)    
+        cmds.xform(
+            jntControlGrp,
+            worldSpace=True,
+            translation=jointPosition,
+            rotation=jointRotation
+        )     
+        if (controlType == 2):  
+            offsetArrow(arrowHeight + 0.5, jntControl)
+ 
+            
         cmds.parentConstraint(jntControl, jnt)
 
-def offsetArrow(offset, arrow):
-    cmds.move(
-        0, offset, 0,
-        arrow + ".cv[*]",
-        relative=True,
-        objectSpace=True
-    )
-    cmds.rotate(
-        0, 90, 0,
-        arrow + ".cv[*]",
-        relative=True,
-        objectSpace=True
-    )
 ######## FUNCTION TO CREATE A CUBE ########
 ## This function allows you to create a nurbs cube with a given size.
 ## This is used to create the pole vector.
@@ -99,9 +107,25 @@ def createNurbsCube(name, size):
     createdCube = cmds.curve(name=name, d=1, p=points)
     return createdCube    
 
+def offsetArrow(offset, arrow):
+    cmds.move(
+        0, offset, 0,
+        arrow + ".cv[*]",
+        relative=True,
+        objectSpace=True
+    )
+    cmds.rotate(
+        0, 90, 0,
+        arrow + ".cv[*]",
+        relative=True,
+        objectSpace=True
+    )
+    
 def createNurbsArrow(name, size):
     s = size
-    offsetY = -0.5 * s
+
+    offsetY = -0.5 * s    
+        
     basePoints = [
         (0, 0, 0), (-2,2,0), (-1,2,0), (-1,6,0), (1,6,0), (1,2,0), (2,2,0), (0,0,0)
     ]
@@ -122,12 +146,13 @@ def isControl(obj):
     shapes = cmds.listRelatives(obj, shapes=True) or []
     return any(cmds.nodeType(shape) == "nurbsCurve" for shape in shapes)
     
-def swapControlShape(radiusField, controlColour, newControlRadio, linearCheck):
+def swapControlShape(radiusField, controlColour, newControlRadio, linearCheck, sectionsField, arrowHeightField):
     #'Cube', 'Arrow', 'Circle'
     swapControlResults = cmds.radioButtonGrp(newControlRadio, query=True, select=True)
     controlSize = cmds.intField(radiusField, query=True, value=True)
     linear = cmds.checkBox(linearCheck, query=True, value=True)
-           
+    sections = cmds.intField(sectionsField, query=True, value=True)
+    arrowHeight = cmds.intField(arrowHeightField, query=True, value=True)    
     controls = []
     selected = cmds.ls(selection=True)
     for obj in selected:
@@ -139,7 +164,7 @@ def swapControlShape(radiusField, controlColour, newControlRadio, linearCheck):
         return     
    
     for con in controls:
-        newCtrl = createControlType("tempSwapCtrl", controlSize, swapControlResults, linear)     
+        newCtrl = createControlType("tempSwapCtrl", controlSize, swapControlResults, linear, sections)     
         changeColour(newCtrl, controlColour)
     
         # Get shapes
@@ -157,7 +182,7 @@ def swapControlShape(radiusField, controlColour, newControlRadio, linearCheck):
         )[-1]
     
         if (swapControlResults == 2):
-            offsetArrow(1.5, newShape)
+            offsetArrow(arrowHeight + 0.5, newShape)
             
                  
         # Delete old shapes
@@ -211,36 +236,110 @@ def createWindow():
         pressCommand=lambda *args: newColourSwatch(colourCanvas01, savedCol)
     )
     
-    ikFkMatcherCol = cmds.rowColumnLayout(
-        numberOfColumns=2,
-        columnAttach=([1, 'right', 83], [2, 'left', 5]),
-        parent=mainLayout
-    )
-    cmds.text(label='     Linear Circle:', align='right')   
-    linearCheck = cmds.checkBox(label = "")
-    
-    spacer="                        "            
-
-    savedCol = [controlColour]
-      
-    ikFkMatcherCol = cmds.rowColumnLayout(
+    controlTypeLayout = cmds.rowColumnLayout(
         numberOfColumns=3,
-        columnAttach=([1, 'right', 5], [2, 'left', 5], [3, 'left', 5]),
+        columnAttach=([1, 'right', 5],[2, 'left', 5],[3, 'left', 5]),
         parent=mainLayout
     )
-    cmds.text(label='    Control Type:', align='right')   
-     
+    cmds.text(label='    Control Type:',align='right')
+        
     newControlRadio = cmds.radioButtonGrp(
         labelArray3=['Cube', 'Arrow', 'Circle'],
-        annotation="Matches the arm from the first argument to the second argument.",
         numberOfRadioButtons=3,
-        select=0,
+        select=1,
         columnWidth=([1,55], [2,60], [3,50]),
+    )    
+
+    # -------------------------
+    # Arrow options
+    # -------------------------
+    arrowHeightLayout = cmds.rowColumnLayout(
+        numberOfColumns=2,
+        columnAttach=(
+            [1, 'right', 72],
+            [2, 'left', 5]
+        ),
+        parent=mainLayout,
+        manage=False
+    ) 
+    
+    cmds.text(
+        label='  Arrow Height:',
+        align='right',        
     )
-                    
+    
+    arrowHeightField = cmds.intField(
+        width=40,
+        value=1,
+        minValue=0
+    )
+        
+    # -------------------------
+    # Circle options
+    # -------------------------
+    circleOptionsLayout = cmds.rowColumnLayout(
+        numberOfColumns=2,
+        columnAttach=(
+            [1, 'right', 83],
+            [2, 'left', 5]
+        ),
+        parent=mainLayout,
+        manage=False
+    )
+    
+    cmds.text(
+        label='     Linear Circle:',
+        align='right',
+        height=20
+    )
+    
+    linearCheck = cmds.checkBox(
+        label=""
+    )
+
+    circleSectionsLayout = cmds.rowColumnLayout(
+        numberOfColumns=2,
+        columnAttach=(
+            [1, 'right', 72],
+            [2, 'left', 5]
+        ),
+        parent=mainLayout,
+        manage=False
+    )  
+    
+    cmds.text(
+        label='Circle Sections:',
+        align='right',        
+    )
+    
+    circleSectionsField = cmds.intField(
+        width=40,
+        value=8,
+        minValue=3,
+        maxValue=40
+    )
+    
+    # -------------------------
+    # Radio button callback
+    # -------------------------
+    
+    cmds.radioButtonGrp(
+        newControlRadio,
+        edit=True,
+        changeCommand=lambda *args: updateControlOptions(
+            newControlRadio,
+            arrowHeightLayout,
+            circleOptionsLayout,
+            circleSectionsLayout
+        )
+    )    
+    spacer="                        "            
+
+    savedCol = [controlColour]     
+                  
     cmds.button(
         label="Create Single Control", parent= mainLayout, annotation="Select a joint: create a control for it and parent it to the joint.",
-        command=lambda *args: createSingleControl(radiusField, savedCol[0], newControlRadio, linearCheck)
+        command=lambda *args: createSingleControl(radiusField, savedCol[0], newControlRadio, linearCheck, circleSectionsField, arrowHeightField)
     )   
     cmds.text(label="",parent= mainLayout)
     
@@ -337,13 +436,42 @@ def createWindow():
     )
 
     fk_to_ik_button = cmds.button(label='Change Shape', parent=mainLayout, annotation="Select created the switch: Match the pose between IK and FK.",
-                command=lambda *args: swapControlShape(radiusField, savedCol[0], newControlRadio, linearCheck))
-                               
+                command=lambda *args: swapControlShape(radiusField, savedCol[0], newControlRadio, linearCheck, circleSectionsField, arrowHeightField))
     cmds.text(label="",parent= mainLayout)
     
    
     cmds.showWindow(windowName)    
     
+def updateControlOptions(newControlRadio, arrowHeightLayout, circleOptionsLayout, circleSectionsLayout):
+    controlType = cmds.radioButtonGrp(
+        newControlRadio,
+        query=True,
+        select=True
+    )
+
+    isArrow = controlType == 2
+    isCircle = controlType == 3
+
+    # Arrow options
+    cmds.control(
+        arrowHeightLayout,
+        edit=True,
+        manage=isArrow
+    )
+
+    # Circle options
+    cmds.control(
+        circleOptionsLayout,
+        edit=True,
+        manage=isCircle
+    )
+
+    cmds.control(
+        circleSectionsLayout,
+        edit=True,
+        manage=isCircle
+    )
+            
 def transformShape(translateFields, rotationFields, scaleFields, mirrorFields):
     translateValues = {
         "x":cmds.intField(translateFields["x"], query=True, value=True),
